@@ -20,7 +20,22 @@ GitHub App permissions: Contents, Pull requests and Issues read & write; Metadat
 
 ## Architecture
 
-FILL: `docs/architecture.png` (exported from the reviewer brief's block diagram) and two sentences: one process (TUI + poller + worker + PR watcher over SQLite); one Daytona box per run.
+One Python process: the TUI on the main thread, with background threads for the poller and PR watcher, the worker (one run at a time) and decisions, all sharing one SQLite database. Each run gets its own Daytona box, cloned from a git bundle (no GitHub credential inside), deleted when the run ends.
+
+```mermaid
+flowchart LR
+  GH[(GitHub issues / PRs)] -- Toolkit reads --> P[Poller + PR watcher]
+  P -- sanitise + injection check --> DB[(SQLite: runs, handoffs, audit)]
+  DB --> W[Worker]
+  W -- triage --> O[Orchestrator]
+  O --> E[Repo Explorer] & C[Coder] & PA[PR Agent]
+  C --> T[Test Agent] & TD[Test doctor]
+  O & E & C & T --> BOX[[Daytona box per run]]
+  W -- decision point --> H[Handoff]
+  H --> TUI[TUI: Human Approval]
+  TUI -- approve --> PUB[Publish: re-check, fixed tools] -- one commit + PR --> GH
+  W --> MEM[(Memory: working / episodes / lessons)]
+```
 
 ## How it works
 
@@ -55,20 +70,36 @@ FILL: `![LangSmith trace](docs/langsmith.png)` — one run's trace (Orchestrator
 - Fixed publish tools: the commit is built from the exact approved change; the agent supplies only text.
 - Per-agent tool lists and write permissions, checked at every start-up.
 - Remote sandbox per run, cloned from a git bundle: no GitHub credential ever enters it.
-- FILL: anything decided during the build.
+- A change counts as tested only if the last `verify` test run came after the last edit; a passing "reproduce" run never counts.
+- A decision interrupted by a shutdown (e.g. mid-publish) is put back in the approval list at start-up; re-approving is safe because the publish tools are idempotent.
+- Untrusted issue text is never rendered as markup in the TUI and never as HTML in the dashboard.
+- The dashboard merges only when the latest independent review is for the current commit and says merge-ready.
 
 ## Known limitations
 
-- Daytona's free tier cannot block outbound network traffic; the sandbox holds no credentials and the shell guard refuses network tools, but egress itself is open (measured: FILL).
+- Daytona's free tier cannot block outbound network traffic; the sandbox holds no credentials and the shell guard refuses network tools, but egress itself is open (measured 2026-10-17 on a live box: outbound reachable; box start-up 9.6 s).
 - The local fallback sandbox (macOS `sandbox-exec`: no network, no writes outside the run, CodePilot+'s own files unreadable) is weaker than a remote box.
 - The command guard is a policy filter, not the security boundary: `python` and `pytest` run repository code by design, so the sandbox is the boundary.
 - The Independent Reviewer skips pull requests from forks, and its "tests green" signal comes from a job that runs the PR's own code.
 - LangSmith keeps traces 14 days; README screenshots stand in for links.
-- FILL: limits found while testing.
+- If `main` changed 300 or more files since the run started, GitHub's compare API cannot list them all, so publishing is refused as a possible conflict.
+- Claude Sonnet 5.5 accepts only the default sampling temperature, so runs are not deterministic.
 
 ## Brief vs CodePilot+
 
-FILL: copy the table from spec §17 (approval panel waits → handoffs; git-push prompt → publish approval; Toolkit write tools → fixed tools; NeMo → A3 injection guardrail; local sandbox → Daytona with local fallback; `Permission` → `FilesystemPermission`; subagents spawning subagents → compiled Coder; Toolkit reads only; triage before the graph) and add these rows:
+| Brief | CodePilot+ | Why |
+|---|---|---|
+| Approval panel waits for a keypress | Item waits; agent saves work and moves on (handoff) | No idle sandbox/agent; nothing goes stale |
+| Ask before `git push`; ask a person on every blocked command | Push refused and logged; the only route to GitHub is the publish step, which always needs approval. Known never-needed commands are refused without interrupting anyone; only unexpected commands ask a person | Fewer interruptions, same protection; the sandbox has no GitHub access |
+| PR Agent commits/opens PR with Toolkit `create_*` | PR Agent opens the PR after approval, using fixed tools that replace the Toolkit write tools | Toolkit commits one file per call, has no labels, and its tool names are rejected by AI providers |
+| NeMo Guardrails | A3 injection guardrail | Reuse of measured work |
+| Local sandbox, repo subset | Daytona, full clone; local fallback | Local backend has no isolation; tests need whole repo |
+| `Permission(path, access)`, `summarization=True` | `FilesystemPermission(operations, paths, mode)`; summarisation always on | Real 0.7.23 API |
+| Subagents spawn subagents | Coder is a compiled deep agent | Declarative subagents get no `task` tool |
+| GitHubToolkit (langchain-community) | Used for read tools only | langchain-community prints "being sunset, no longer actively maintained" (0.4.2) |
+| Triage inside Orchestrator | Orchestrator's classification step runs before the graph is built | Graph is built for the chosen skill/subagents |
+
+Also:
 - Polling with the Toolkit runs in plain code, not inside the Orchestrator agent (cheaper; the agent only sees its claimed issue).
 - Skills are structured objects loaded by CodePilot+ (`codepilot:` front matter) rather than mounted through `deepagents.skills`.
 - Labelled issues above the complexity threshold get a plan for a person to approve instead of being skipped; unassigned ones above it are skipped (brief bonus).
