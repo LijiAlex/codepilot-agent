@@ -143,8 +143,13 @@ def merge_pr(repo, number: int, expected_head: str, reviewer_login: str | None) 
         raise MergeRefused("the PR changed since the page loaded; reload and look again")
     if "merge-ready" not in {label.name for label in pr.labels}:
         raise MergeRefused("not labelled merge-ready by the independent reviewer")
-    if reviewer_login and not any(r.user and r.user.login == reviewer_login and r.commit_id == pr.head.sha for r in pr.get_reviews()):
+    if not reviewer_login:
+        raise MergeRefused("no independent reviewer is configured (reviewer_login): merge on GitHub instead")
+    mine = [r for r in pr.get_reviews() if r.user and r.user.login == reviewer_login]
+    if not mine or mine[-1].commit_id != pr.head.sha:
         raise MergeRefused("the independent review is not for the current commit")
+    if "**Merge-ready:** yes" not in (mine[-1].body or ""):      # the label could be stale or added by hand
+        raise MergeRefused("the latest independent review does not say merge-ready")
     if pr.mergeable is False:
         raise MergeRefused("GitHub reports conflicts")
     status = pr.merge(sha=expected_head, merge_method="squash")

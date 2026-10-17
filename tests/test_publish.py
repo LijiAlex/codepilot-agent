@@ -145,3 +145,10 @@ def test_unassigned_pickup_is_not_expired_for_missing_label():
     repo = PubRepo(); repo.issue.labels = []
     assert recheck_issue(repo, {**payload(), "labelled": False}) is None
     assert recheck_issue(repo, payload()) == "label ai-assignable removed"
+
+
+def test_base_moved_too_far_to_compare_is_treated_as_a_conflict(env):
+    env.repo.refs["heads/main"] = "head2"
+    env.repo.compare_files = [NS(filename=f"gen/f{i}.py", previous_filename=None) for i in range(300)]   # GitHub's cap
+    out = publish(ps(env, agent_script(env)), env.hid)
+    assert (out.state, out.reason) == ("FAILED", "conflict") and "heads/codepilot/issue-7-empty-title" not in env.repo.refs

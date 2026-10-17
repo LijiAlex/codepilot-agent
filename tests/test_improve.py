@@ -121,3 +121,20 @@ def test_end_to_end_worker_run_then_improver_then_dashboard_approval(tmp_path):
     assert c.post(f"/api/improvements/{pid}/approve", headers=h, json={"confirm": True}).json()["version"] == 2
     assert [v["version"] for v in c.get("/api/skills", headers=h).json()["repo_skills"]["o/r"]] == [1, 2]
     assert "cd sandbox && python -m pytest -q" in skills.render("o/r")[1]
+
+
+def test_a_double_click_applies_an_approved_change_once(tmp_path):
+    conn = connect(tmp_path / "cp.db")
+    skills = RepoSkillStore(conn); skills.ensure_v1(CFG, FILES)
+    store = ImprovementStore(conn, skills)
+    rep = GapReport(summary="s", proposals=[Proposal(op="add", section="gotchas", text="Run tests from the repo root", evidence="e")])
+    pid = store.record_report("o/r", "run1", rep)[0]
+    applied, real_apply, nested = [], skills.apply, []
+
+    def apply(*a):                                   # the second click lands while the first is applying
+        applied.append(a)
+        nested.append(store.decide(pid, "approve", "dashboard"))
+        return real_apply(*a)
+    skills.apply = apply
+    assert store.decide(pid, "approve", "dashboard")["status"] == "approved"
+    assert len(applied) == 1 and nested == [{"status": "stale"}]

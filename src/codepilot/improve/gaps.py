@@ -102,14 +102,18 @@ class ImprovementStore:
 
     def decide(self, proposal_id: str, decision: str, by: str) -> dict:
         row = self.conn.execute("select * from repo_skill_proposals where id=? and status='pending'", (proposal_id,)).fetchone()
-        if row is None:
+        status = "approved" if decision == "approve" else "rejected"
+        claimed = self.conn.execute("update repo_skill_proposals set status=? where id=? and status='pending'", (status, proposal_id))
+        if row is None or claimed.rowcount != 1:                 # compare-and-set: a second click finds it decided
             return {"status": "stale"}
-        if decision == "approve":
+        if decision != "approve":
+            return {"status": "rejected"}
+        try:
             v = self.skills.apply(row["repo"], row["op"], row["section"], row["text"], row["step_id"], row["last_run"])
-            self.conn.execute("update repo_skill_proposals set status='approved' where id=?", (proposal_id,))
-            return {"status": "approved", "version": v}
-        self.conn.execute("update repo_skill_proposals set status='rejected' where id=?", (proposal_id,))
-        return {"status": "rejected"}
+        except Exception:
+            self.conn.execute("update repo_skill_proposals set status='pending' where id=?", (proposal_id,))
+            raise
+        return {"status": "approved", "version": v}
 
     def skill_history(self, repo: str) -> list[dict]:
         return self.skills.history(repo)

@@ -41,8 +41,10 @@ class Poller:
             if h["repo"] != full_name or not h["issue_key"].startswith("#"):
                 continue
             if repo.get_issue(int(h["issue_key"][1:])).state != "open":
-                self.ps.handoffs.mark(h["id"], "expired")
+                if not self.ps.handoffs.expire(h["id"], "issue closed"):
+                    continue                                  # decided in the meantime
                 self.ps.runs.set_state(h["run_id"], RunState.CLOSED, "stale: issue closed")
+                self.ps.on_notice(f"{full_name}{h['issue_key']} was closed on GitHub — its approval item was withdrawn")
                 out.append(h["issue_key"])
         return out
 

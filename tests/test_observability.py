@@ -24,3 +24,13 @@ def test_tokens_counted_and_cost():
     tr.translate((), "updates", {"model": {"messages": [m]}})
     assert (tr.tokens_in, tr.tokens_out) == (1000, 200)
     assert cost_usd(1_000_000, 100_000, 3.0, 15.0) == 4.5 and cost_usd(1, 1, None, 15.0) is None
+
+
+def test_langchains_own_unredacted_tracer_is_switched_off(monkeypatch):
+    import os
+    from codepilot.observability import make_tracer
+    for k in ("LANGSMITH_TRACING", "LANGCHAIN_TRACING_V2", "LANGCHAIN_TRACING"):
+        monkeypatch.setenv(k, "true")
+    monkeypatch.delenv("LANGSMITH_API_KEY", raising=False)
+    make_tracer()
+    assert all(os.environ[k] == "false" for k in ("LANGSMITH_TRACING", "LANGCHAIN_TRACING_V2", "LANGCHAIN_TRACING"))

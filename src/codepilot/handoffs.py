@@ -43,6 +43,11 @@ class HandoffStore:
     def mark(self, hid: str, status: str) -> None:
         self.conn.execute("update handoffs set status=? where id=?", (status, hid))
 
+    def expire(self, hid: str, reason: str) -> bool:
+        """Expire one item only if it is still pending (a person may be approving it right now)."""
+        cur = self.conn.execute("update handoffs set status='expired', reason=? where id=? and status='pending'", (reason, hid))
+        return cur.rowcount == 1
+
     def reopen_interrupted(self) -> int:
         """Startup: a decision whose run is still AWAITING_APPROVAL never finished (process stopped mid-publish or
         mid-continuation) — put it back in the approval list. Safe to re-approve: the publish tools are idempotent."""

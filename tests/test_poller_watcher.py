@@ -62,6 +62,7 @@ def test_poll_expires_handoffs_of_closed_issues(env):
     env.issues[1].state = "closed"
     r = Poller(env.ps).poll()
     assert r.expired == ["#1"] and env.handoffs.get(hid)["status"] == "expired" and env.runs.get(rid)["state"] == "CLOSED"
+    assert any("#1" in n and "closed" in n for n in env.notices)                # the person is told why it vanished
 
 
 class PRRepo:

@@ -19,6 +19,7 @@ from codepilot.safety.allowlist import make_tool_allowlist
 from codepilot.safety.sanitize import sanitize_untrusted
 from codepilot.states import RunState
 
+COMPARE_FILE_CAP = 300
 PREFIX = {"bug_fix": "fix", "feature_addition": "feat", "documentation": "docs", "dependency_update": "build",
           "config_change": "chore"}
 PUBLISH_TOOLS = {"create_branch", "create_commit", "create_pull_request"}
@@ -116,11 +117,14 @@ def publish(ps: PublishServices, handoff_id: str) -> PublishOutcome:
     start, tested_at = base, None
     if head != base:
         moved = set()
-        for f in repo.compare(base, head).files:
+        files = repo.compare(base, head).files
+        for f in files:
             moved.add(f.filename)
             if f.previous_filename:
                 moved.add(f.previous_filename)
         touched = {s["path"] for s in payload["saved"]}
+        if len(files) >= COMPARE_FILE_CAP:                  # GitHub lists only the first 300: overlap cannot be ruled out
+            moved |= touched
         if moved & touched:
             ps.runs.set_state(run_id, RunState.FAILED, "conflict")
             ps.on_notice(f"{h['repo']} {h['issue_key']}: main changed {sorted(moved & touched)} since the run — not published")

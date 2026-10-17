@@ -22,12 +22,13 @@ POST_H = {**H, "origin": f"http://127.0.0.1:{PORT}"}
 
 
 class FakePR:
-    def __init__(self, n, head="h1", labels=("codepilot-generated", "merge-ready"), review_sha="h1", mergeable=True):
+    def __init__(self, n, head="h1", labels=("codepilot-generated", "merge-ready"), review_sha="h1", mergeable=True,
+                 verdict="**Merge-ready:** yes"):
         self.number, self.title, self.html_url = n, "<img src=x onerror=alert(1)>", f"https://github.com/o/r/pull/{n}"
         self.user, self.head = NS(login="alice"), NS(sha=head)
         self.labels = [NS(name=l) for l in labels]
         self.mergeable, self.merged_with, self.state = mergeable, None, "open"
-        self._reviews = [NS(user=NS(login="rev[bot]"), commit_id=review_sha, body="Score 9/10", state="COMMENTED")]
+        self._reviews = [NS(user=NS(login="rev[bot]"), commit_id=review_sha, body=f"**Score:** 9/10\n{verdict}", state="COMMENTED")]
     def get_reviews(self): return self._reviews
     def merge(self, sha, merge_method):
         if self.number == 6:
@@ -144,3 +145,13 @@ def test_dashboard_thread_shares_the_engine_services(tmp_path, monkeypatch):
     url, thread = cli.start_dashboard_thread(eng, Settings(repos=[RepoConfig(owner="o", name="r")], home=tmp_path), tmp_path, 8771)
     thread.join(2)
     assert url.startswith("http://127.0.0.1:8771/#token=") and started == {"host": "127.0.0.1", "port": 8771, "ran": True}
+
+
+def test_merge_needs_the_current_review_to_say_merge_ready_and_a_configured_reviewer():
+    from codepilot.dashboard.data import MergeRefused, merge_pr
+    stale_label = FakeRepo([FakePR(8, verdict="**Merge-ready:** no — score 4 < 7")])
+    with pytest.raises(MergeRefused):
+        merge_pr(stale_label, 8, "h1", "rev[bot]")
+    with pytest.raises(MergeRefused):
+        merge_pr(FakeRepo([FakePR(9)]), 9, "h1", None)
+    assert merge_pr(FakeRepo([FakePR(10)]), 10, "h1", "rev[bot]")["merged"]

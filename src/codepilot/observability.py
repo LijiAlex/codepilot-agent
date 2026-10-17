@@ -20,6 +20,8 @@ def _redact(value: Any) -> Any:
 
 def make_tracer(project: str = "codepilot-plus"):
     """A LangChain tracer whose client redacts every input and output; None when LangSmith is not configured."""
+    for k in ("LANGSMITH_TRACING", "LANGCHAIN_TRACING_V2", "LANGCHAIN_TRACING"):
+        os.environ[k] = "false"           # LangChain's env-enabled tracer does not redact: only ours may send traces
     if not os.environ.get("LANGSMITH_API_KEY"):
         return None
     from langchain_core.tracers.langchain import LangChainTracer
