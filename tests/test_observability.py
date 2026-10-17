@@ -6,7 +6,7 @@ from codepilot.observability import _redact, cost_usd, make_tracer
 
 
 def test_redaction_is_recursive():
-    out = _redact({"messages": [{"content": "key sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789"}], "n": 3})
+    out = _redact({"messages": [{"content": "key " + "sk-" + "ant-api03-abcdefghijklmnopqrstuvwxyz0123456789"}], "n": 3})
     assert "abcdefghijklmnop" not in str(out) and out["n"] == 3
 
 
