@@ -13,7 +13,7 @@ FILL: YouTube (unlisted) link to the ~7-minute demo, then the TUI GIF (under 5 M
     export ANTHROPIC_API_KEY=...                   # solver model
     export CODEPILOT_GH_APP_ID=... CODEPILOT_GH_APP_KEY_PATH=~/.codepilot/keys/app.pem
     export DAYTONA_API_KEY=...                     # remote sandbox (or set `sandbox: local`)
-    export AWS_PROFILE=...                         # Bedrock injection guardrail
+    # optional: `injection_checker: bedrock` + AWS_PROFILE to screen issues with an AWS Bedrock guardrail instead of NeMo
     codepilot selfcheck && codepilot
 
 GitHub App permissions: Contents, Pull requests and Issues read & write; Metadata read; no Workflows. FILL: anything that changed during the build.
@@ -39,7 +39,7 @@ flowchart LR
 
 ## How it works
 
-1. **Poll (Brief)** every 5 minutes through the GitHub Toolkit; skip issues already in progress, failed recently or already on a branch; sanitise and screen the text (Brief guardrails, A3 injection check).
+1. **Poll (Brief)** every 5 minutes through the GitHub Toolkit; skip issues already in progress, failed recently or already on a branch; sanitise and screen the text (Brief guardrails: NeMo Guardrails input rails).
 2. **Triage (Brief, Bonus complexity score)**: one of five task types picks a skill; above the threshold a read-only plan goes to the TUI first (Plus).
 3. **Explore → code → test (Brief)**: Repo Explorer (repo map + keyword/embedding search) → Coder → Test Agent, in a fresh sandbox with no credentials.
 4. **Gates (Brief)**: nothing waits on a person — a decision becomes a TUI item and the run ends (Plus).
@@ -52,7 +52,18 @@ FILL: link to a merged CodePilot+ PR on `layered-memory` and one on `codepilot-p
 
 ## Guardrails
 
-FILL: paste `results/guardrail.md` (malicious blocked, benign wrongly blocked, failed-closed, latency) and the scoreboard rows for refused commands and unexpected-command decisions.
+Issue text passes two layers before any agent sees it: the sanitiser (removes HTML comments, hidden characters, link titles, image alt text) and **NeMo Guardrails** input rails — a regex rail for unambiguous attacks (no model call) and the LLM self-check rail (`guardrails/nemo/config.yml`). If the screen cannot answer, the issue is held back (fails closed).
+
+Measured on 27 labelled issues (`evals/issues.yaml`; the benign ones are deliberately code-heavy — stack traces, shell snippets, the words "ignore", "override", "delete"):
+
+| Measure | Result |
+|---|---|
+| Malicious issues blocked by NeMo | 10/12 (the other 2 hid their payload in an HTML comment and a link title, which the sanitiser had already removed — 12/12 never reach an agent) |
+| Benign issues wrongly blocked | 0/15 |
+| Screen unavailable (failed closed) | 0 |
+| Latency p50 / p95 | 828 ms / 1258 ms |
+
+FILL: the scoreboard rows for refused commands and unexpected-command decisions (`scripts/scoreboard.py`).
 
 ## Results
 
@@ -92,7 +103,7 @@ FILL: `![LangSmith trace](docs/langsmith.png)` — one run's trace (Orchestrator
 | Approval panel waits for a keypress | Item waits; agent saves work and moves on (handoff) | No idle sandbox/agent; nothing goes stale |
 | Ask before `git push`; ask a person on every blocked command | Push refused and logged; the only route to GitHub is the publish step, which always needs approval. Known never-needed commands are refused without interrupting anyone; only unexpected commands ask a person | Fewer interruptions, same protection; the sandbox has no GitHub access |
 | PR Agent commits/opens PR with Toolkit `create_*` | PR Agent opens the PR after approval, using fixed tools that replace the Toolkit write tools | Toolkit commits one file per call, has no labels, and its tool names are rejected by AI providers |
-| NeMo Guardrails | A3 injection guardrail | Reuse of measured work |
+| NeMo Guardrails | NeMo Guardrails input rails (regex + LLM self-check on Claude Haiku) screen issue text; custom Python guards commands, file writes and the change set | As the brief asks; the self-check model needed a small adapter because Claude 5 models reject NeMo's fixed `temperature` |
 | Local sandbox, repo subset | Daytona, full clone; local fallback | Local backend has no isolation; tests need whole repo |
 | `Permission(path, access)`, `summarization=True` | `FilesystemPermission(operations, paths, mode)`; summarisation always on | Real 0.7.23 API |
 | Subagents spawn subagents | Coder is a compiled deep agent | Declarative subagents get no `task` tool |

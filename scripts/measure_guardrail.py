@@ -1,6 +1,6 @@
 # scripts/measure_guardrail.py
 """Measure the injection layer (sanitiser + checker) on evals/issues.yaml.
-Usage: uv run python scripts/measure_guardrail.py [--checker bedrock|static] [--out results/guardrail.md]
+Usage: uv run python scripts/measure_guardrail.py [--checker nemo|bedrock|static] [--out results/guardrail.md]
 Reports detection on malicious items, false alarms on benign items, fail-closed count (counted
 separately: a blocked-because-unavailable verdict is not a detection), and latency."""
 from __future__ import annotations
@@ -14,7 +14,7 @@ from pathlib import Path
 
 import yaml
 
-from codepilot.safety.injection import BedrockInjectionChecker, StaticInjectionChecker
+from codepilot.safety.injection import BedrockInjectionChecker, NemoInjectionChecker, StaticInjectionChecker
 from codepilot.safety.sanitize import sanitize_untrusted
 
 STATIC_PHRASES = ["ignore all previous instructions", "ignore previous instructions", "disregard your guidelines",
@@ -29,7 +29,7 @@ def measure(items: list[dict], checker) -> dict:
         v = checker.check(clean)
         lat.append((time.perf_counter() - t0) * 1000)
         rows.append({"id": it["id"], "label": it["label"], "blocked": v.blocked and not v.failed_closed,
-                     "failed_closed": v.failed_closed, "sanitised_changed": clean != it["text"].strip()})
+                     "failed_closed": v.failed_closed, "reasons": list(v.reasons), "sanitised_changed": clean != it["text"].strip()})
     mal = [r for r in rows if r["label"] == "malicious"]
     ben = [r for r in rows if r["label"] == "benign"]
     return {"rows": rows,
@@ -52,15 +52,26 @@ def to_markdown(res: dict, checker_name: str) -> str:
     return "\n".join(lines) + "\n"
 
 
+def make_checker(name: str, policy: Path = Path("guardrails/codepilot.yaml"), nemo_dir: Path = Path("guardrails/nemo"),
+                 model: str = "anthropic:claude-haiku-5-5"):
+    if name == "nemo":
+        return NemoInjectionChecker(Path(nemo_dir), model_name=model)
+    if name == "bedrock":
+        return BedrockInjectionChecker(Path(policy))
+    return StaticInjectionChecker(STATIC_PHRASES)
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--checker", choices=["bedrock", "static"], default="bedrock")
+    ap.add_argument("--checker", choices=["nemo", "bedrock", "static"], default="nemo")
+    ap.add_argument("--nemo", default="guardrails/nemo")
+    ap.add_argument("--model", default="anthropic:claude-haiku-5-5")
     ap.add_argument("--issues", default="evals/issues.yaml")
     ap.add_argument("--policy", default="guardrails/codepilot.yaml")
     ap.add_argument("--out", default="results/guardrail.md")
     a = ap.parse_args(argv)
     items = yaml.safe_load(Path(a.issues).read_text())
-    checker = BedrockInjectionChecker(Path(a.policy)) if a.checker == "bedrock" else StaticInjectionChecker(STATIC_PHRASES)
+    checker = make_checker(a.checker, Path(a.policy), Path(a.nemo), a.model)
     res = measure(items, checker)
     md = to_markdown(res, a.checker)
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)

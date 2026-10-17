@@ -25,7 +25,7 @@ from codepilot.poller import PollServices, Poller
 from codepilot.publish import PublishServices
 from codepilot.repomap.mirror import HostMirror
 from codepilot.runs import RunStore
-from codepilot.safety.injection import BedrockInjectionChecker
+from codepilot.safety.injection import BedrockInjectionChecker, NemoInjectionChecker
 from codepilot.sandbox.daytona import DaytonaSandboxProvider
 from codepilot.sandbox.local import LocalSandboxProvider
 from codepilot.watcher import PRWatcher, WatchServices
@@ -73,9 +73,13 @@ def build_engine(settings: Settings, ui: UiCallbacks, config_dir: Path = Path(".
         skill_store.ensure_v1(cfg, map_files)
         return skill_store.render(cfg.full_name)
 
-    policy = settings.guardrail_policy_path
-    policy = policy if policy.is_absolute() else (Path(config_dir) / policy)
-    checker = BedrockInjectionChecker(policy)
+    def _rel(p: Path) -> Path:                       # relative paths resolve against the config file's folder
+        return p if p.is_absolute() else Path(config_dir) / p
+
+    if settings.injection_checker == "bedrock":
+        checker = BedrockInjectionChecker(_rel(settings.guardrail_policy_path))
+    else:
+        checker = NemoInjectionChecker(_rel(settings.nemo_config_path), model_name=settings.guardrail_model)
     key_dir = [Path(os.environ[settings.github_app_key_path_env]).expanduser().parent] if os.environ.get(settings.github_app_key_path_env) else []
     providers = {"local": LocalSandboxProvider(home, home / "repos", extra_deny=key_dir),     # ~/.codepilot is always denied
                  "daytona": DaytonaSandboxProvider(home, home / "repos", snapshot=settings.daytona_snapshot,

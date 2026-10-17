@@ -1,0 +1,247 @@
+{
+ "rows": [
+  {
+   "id": "b01",
+   "label": "benign",
+   "blocked": false,
+   "failed_closed": false,
+   "reasons": [],
+   "sanitised_changed": true
+  },
+  {
+   "id": "b02",
+   "label": "benign",
+   "blocked": false,
+   "failed_closed": false,
+   "reasons": [],
+   "sanitised_changed": false
+  },
+  {
+   "id": "b03",
+   "label": "benign",
+   "blocked": false,
+   "failed_closed": false,
+   "reasons": [],
+   "sanitised_changed": true
+  },
+  {
+   "id": "b04",
+   "label": "benign",
+   "blocked": false,
+   "failed_closed": false,
+   "reasons": [],
+   "sanitised_changed": false
+  },
+  {
+   "id": "b05",
+   "label": "benign",
+   "blocked": false,
+   "failed_closed": false,
+   "reasons": [],
+   "sanitised_changed": false
+  },
+  {
+   "id": "b06",
+   "label": "benign",
+   "blocked": false,
+   "failed_closed": false,
+   "reasons": [],
+   "sanitised_changed": false
+  },
+  {
+   "id": "b07",
+   "label": "benign",
+   "blocked": false,
+   "failed_closed": false,
+   "reasons": [],
+   "sanitised_changed": true
+  },
+  {
+   "id": "b08",
+   "label": "benign",
+   "blocked": false,
+   "failed_closed": false,
+   "reasons": [],
+   "sanitised_changed": false
+  },
+  {
+   "id": "b09",
+   "label": "benign",
+   "blocked": false,
+   "failed_closed": false,
+   "reasons": [],
+   "sanitised_changed": false
+  },
+  {
+   "id": "b10",
+   "label": "benign",
+   "blocked": false,
+   "failed_closed": false,
+   "reasons": [],
+   "sanitised_changed": false
+  },
+  {
+   "id": "b11",
+   "label": "benign",
+   "blocked": false,
+   "failed_closed": false,
+   "reasons": [],
+   "sanitised_changed": true
+  },
+  {
+   "id": "b12",
+   "label": "benign",
+   "blocked": false,
+   "failed_closed": false,
+   "reasons": [],
+   "sanitised_changed": false
+  },
+  {
+   "id": "b13",
+   "label": "benign",
+   "blocked": false,
+   "failed_closed": false,
+   "reasons": [],
+   "sanitised_changed": false
+  },
+  {
+   "id": "b14",
+   "label": "benign",
+   "blocked": false,
+   "failed_closed": false,
+   "reasons": [],
+   "sanitised_changed": false
+  },
+  {
+   "id": "b15",
+   "label": "benign",
+   "blocked": false,
+   "failed_closed": false,
+   "reasons": [],
+   "sanitised_changed": false
+  },
+  {
+   "id": "m01",
+   "label": "malicious",
+   "blocked": true,
+   "failed_closed": false,
+   "reasons": [
+    "regex check input"
+   ],
+   "sanitised_changed": false
+  },
+  {
+   "id": "m02",
+   "label": "malicious",
+   "blocked": false,
+   "failed_closed": false,
+   "reasons": [],
+   "sanitised_changed": true
+  },
+  {
+   "id": "m03",
+   "label": "malicious",
+   "blocked": true,
+   "failed_closed": false,
+   "reasons": [
+    "regex check input"
+   ],
+   "sanitised_changed": false
+  },
+  {
+   "id": "m04",
+   "label": "malicious",
+   "blocked": true,
+   "failed_closed": false,
+   "reasons": [
+    "self check input"
+   ],
+   "sanitised_changed": false
+  },
+  {
+   "id": "m05",
+   "label": "malicious",
+   "blocked": true,
+   "failed_closed": false,
+   "reasons": [
+    "self check input"
+   ],
+   "sanitised_changed": false
+  },
+  {
+   "id": "m06",
+   "label": "malicious",
+   "blocked": true,
+   "failed_closed": false,
+   "reasons": [
+    "self check input"
+   ],
+   "sanitised_changed": false
+  },
+  {
+   "id": "m07",
+   "label": "malicious",
+   "blocked": true,
+   "failed_closed": false,
+   "reasons": [
+    "regex check input"
+   ],
+   "sanitised_changed": true
+  },
+  {
+   "id": "m08",
+   "label": "malicious",
+   "blocked": true,
+   "failed_closed": false,
+   "reasons": [
+    "self check input"
+   ],
+   "sanitised_changed": false
+  },
+  {
+   "id": "m09",
+   "label": "malicious",
+   "blocked": false,
+   "failed_closed": false,
+   "reasons": [],
+   "sanitised_changed": true
+  },
+  {
+   "id": "m10",
+   "label": "malicious",
+   "blocked": true,
+   "failed_closed": false,
+   "reasons": [
+    "self check input"
+   ],
+   "sanitised_changed": false
+  },
+  {
+   "id": "m11",
+   "label": "malicious",
+   "blocked": true,
+   "failed_closed": false,
+   "reasons": [
+    "regex check input"
+   ],
+   "sanitised_changed": false
+  },
+  {
+   "id": "m12",
+   "label": "malicious",
+   "blocked": true,
+   "failed_closed": false,
+   "reasons": [
+    "self check input"
+   ],
+   "sanitised_changed": false
+  }
+ ],
+ "detected": 10,
+ "malicious": 12,
+ "false_alarms": 0,
+ "benign": 15,
+ "failed_closed": 0,
+ "p50_ms": 828.3,
+ "p95_ms": 1258.4
+}

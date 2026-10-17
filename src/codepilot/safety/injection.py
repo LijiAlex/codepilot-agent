@@ -1,5 +1,6 @@
 # src/codepilot/safety/injection.py
-"""Prompt-injection screen for issue and PR text, backed by the A3 guardrail.
+"""Prompt-injection screen for issue and PR text: NeMo Guardrails input rails (the brief's framework; default) or the
+A3 Bedrock guardrail.
 
 Any failure to reach the guardrail blocks the text ("fails closed") and is
 reported separately from a real detection.
@@ -53,3 +54,48 @@ class StaticInjectionChecker:
     def check(self, text: str) -> InjectionVerdict:
         hits = [p for p in self.phrases if p in text.lower()]
         return InjectionVerdict(blocked=bool(hits), reasons=hits)
+
+
+def guardrail_llm(name: str):
+    """A Claude chat model for the self-check rail. NeMo always sends `temperature` (0.001) and Claude 5 models reject
+    any sampling parameter (live, 2026-10-17: HTTP 400 "temperature is deprecated for this model"), so drop them."""
+    from langchain_anthropic import ChatAnthropic
+
+    class _Claude(ChatAnthropic):
+        def _get_request_payload(self, input_, *, stop=None, **kwargs):
+            for k in ("temperature", "top_p", "top_k"):
+                kwargs.pop(k, None)
+            return super()._get_request_payload(input_, stop=stop, **kwargs)
+
+    provider, _, model = name.partition(":")
+    if provider != "anthropic":
+        from langchain.chat_models import init_chat_model
+        return init_chat_model(name, max_tokens=16, timeout=60)
+    return _Claude(model=model, max_tokens=16, timeout=60, max_retries=2)
+
+
+class NemoInjectionChecker:
+    """NeMo Guardrails input rails: a regex rail (known attacks, no model call) then the LLM self-check rail."""
+
+    def __init__(self, config_dir: Path, llm: Any = None, model_name: str = "anthropic:claude-haiku-5-5"):
+        self.config_dir, self._llm, self.model_name = Path(config_dir), llm, model_name
+        self._rails: Any | None = None
+
+    def _get_rails(self):
+        if self._rails is None:
+            import warnings
+            from nemoguardrails import LLMRails, RailsConfig
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                self._rails = LLMRails(RailsConfig.from_path(str(self.config_dir)), llm=self._llm or guardrail_llm(self.model_name))
+        return self._rails
+
+    def check(self, text: str) -> InjectionVerdict:
+        try:
+            res = self._get_rails().generate(messages=[{"role": "user", "content": text}],
+                                             options={"rails": ["input"], "log": {"activated_rails": True}})
+            stopped = [a.name for a in (res.log.activated_rails or []) if a.stop]
+        except Exception as exc:                      # model unreachable, throttled, misconfigured
+            self._rails = None
+            return InjectionVerdict(blocked=True, failed_closed=True, reasons=[f"guardrail unavailable: {type(exc).__name__}"])
+        return InjectionVerdict(blocked=bool(stopped), reasons=stopped)

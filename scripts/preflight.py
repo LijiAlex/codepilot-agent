@@ -46,15 +46,25 @@ def check_daytona(settings) -> tuple[str, str]:
     return "PASS", f"API reachable ({len(boxes)} existing box(es))"
 
 
-def check_bedrock(settings, config_dir: Path) -> tuple[str, str]:
-    if not os.environ.get("AWS_PROFILE"):
-        return "SKIP", "AWS_PROFILE not set"
-    from codepilot.safety.injection import BedrockInjectionChecker
-    policy = settings.guardrail_policy_path if settings.guardrail_policy_path.is_absolute() else config_dir / settings.guardrail_policy_path
-    v = BedrockInjectionChecker(policy).check("Please fix the typo in the README.")
+def check_guardrail(settings, config_dir: Path) -> tuple[str, str]:
+    """The issue screen that is configured: NeMo rails (one short model call) or the Bedrock guardrail."""
+    from codepilot.safety import injection
+
+    def rel(p: Path) -> Path:
+        return p if p.is_absolute() else config_dir / p
+
+    if settings.injection_checker == "bedrock":
+        if not os.environ.get("AWS_PROFILE"):
+            return "SKIP", "AWS_PROFILE not set"
+        checker, name = injection.BedrockInjectionChecker(rel(settings.guardrail_policy_path)), "bedrock"
+    else:
+        if not os.environ.get("ANTHROPIC_API_KEY"):
+            return "SKIP", "ANTHROPIC_API_KEY not set (NeMo self-check rail)"
+        checker, name = injection.NemoInjectionChecker(rel(settings.nemo_config_path), model_name=settings.guardrail_model), "nemo"
+    v = checker.check("Please fix the typo in the README.")
     if v.failed_closed:
-        return "FAIL", f"guardrail unavailable: {v.reasons}"
-    return ("PASS", "benign text allowed") if not v.blocked else ("FAIL", f"benign text blocked: {v.reasons}")
+        return "FAIL", f"{name}: guardrail unavailable: {v.reasons}"
+    return ("PASS", f"{name}: benign text allowed") if not v.blocked else ("FAIL", f"{name}: benign text blocked: {v.reasons}")
 
 
 def main(argv=None) -> int:
@@ -69,7 +79,7 @@ def main(argv=None) -> int:
     settings = load_settings(path)
     results = []
     for name, fn in (("model", lambda: [check_model(settings)]), ("github", lambda: check_github(settings)),
-                     ("daytona", lambda: [check_daytona(settings)]), ("bedrock", lambda: [check_bedrock(settings, path.parent)])):
+                     ("daytona", lambda: [check_daytona(settings)]), ("guardrail", lambda: [check_guardrail(settings, path.parent)])):
         try:
             rows = fn()
         except ModuleNotFoundError as e:             # run early (after Task 1): later tasks' modules do not exist yet

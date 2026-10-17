@@ -6,6 +6,8 @@ them, and only CodePilot's own code reads those variables.
 """
 from __future__ import annotations
 
+from typing import Literal
+
 from pathlib import Path
 
 import yaml
@@ -59,6 +61,9 @@ class Settings(BaseModel):
     github_app_id_env: str = "CODEPILOT_GH_APP_ID"
     github_app_key_path_env: str = "CODEPILOT_GH_APP_KEY_PATH"
     guardrail_policy_path: Path = Path("guardrails/codepilot.yaml")
+    injection_checker: Literal["nemo", "bedrock"] = "nemo"   # issue screen: NeMo Guardrails (brief) or the A3 Bedrock guardrail
+    nemo_config_path: Path = Path("guardrails/nemo")
+    guardrail_model: str = "anthropic:claude-haiku-5-5"      # the NeMo self-check rail's model (one short yes/no call per issue)
     home: Path = Field(default_factory=lambda: Path.home() / ".codepilot")
 
 

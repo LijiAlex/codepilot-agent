@@ -20,6 +20,7 @@ dependencies = [
   "guardrail-eval-pipeline",
   "fastapi",       # dashboard (Plus); already locked as a dependency of guardrail-eval-pipeline
   "uvicorn",
+  "nemoguardrails>=0.24.1",
 ]
 
 [project.scripts]

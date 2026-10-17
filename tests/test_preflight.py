@@ -18,7 +18,7 @@ def test_everything_skips_without_keys(tmp_path, monkeypatch, capsys):
     (tmp_path / "codepilot.yml").write_text(CFG)
     assert pf.main(["--config", str(tmp_path / "codepilot.yml")]) == 0
     out = capsys.readouterr().out
-    assert out.count("SKIP") == 4 and "FAIL" not in out
+    assert out.count("SKIP") == 4 and "FAIL" not in out and "SKIP guardrail" in out
 
 
 def test_model_pass_and_one_failure_does_not_hide_others(tmp_path, monkeypatch, capsys):
@@ -28,6 +28,25 @@ def test_model_pass_and_one_failure_does_not_hide_others(tmp_path, monkeypatch, 
     monkeypatch.setenv("DAYTONA_API_KEY", "test-not-real")
     monkeypatch.setattr(pf, "check_daytona", lambda settings: (_ for _ in ()).throw(RuntimeError("401 bad key")))
     monkeypatch.delenv("AWS_PROFILE", raising=False)
+    monkeypatch.setattr(pf, "check_guardrail", lambda settings, d: ("SKIP", "offline test"))   # no real model call
     assert pf.main(["--config", str(tmp_path / "codepilot.yml")]) == 1
     out = capsys.readouterr().out
-    assert "PASS model" in out and "FAIL daytona  RuntimeError: 401 bad key" in out and "SKIP bedrock" in out
+    assert "PASS model" in out and "FAIL daytona  RuntimeError: 401 bad key" in out and "SKIP guardrail" in out
+
+
+def test_guardrail_check_runs_the_configured_nemo_rails(tmp_path, monkeypatch, capsys):
+    from codepilot.safety.injection import InjectionVerdict
+    (tmp_path / "codepilot.yml").write_text(CFG)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-not-real")
+    seen = []
+    class FakeNemo:
+        def __init__(self, config_dir, model_name): seen.append((config_dir, model_name))
+        def check(self, text): return InjectionVerdict(blocked=False)
+    monkeypatch.setattr("codepilot.safety.injection.NemoInjectionChecker", FakeNemo)
+    assert pf.check_guardrail(pf_settings(tmp_path), tmp_path) == ("PASS", "nemo: benign text allowed")
+    assert seen == [(tmp_path / "guardrails" / "nemo", "anthropic:claude-haiku-5-5")]
+
+
+def pf_settings(tmp_path):
+    from codepilot.config import load_settings
+    return load_settings(tmp_path / "codepilot.yml")
