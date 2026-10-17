@@ -28,7 +28,8 @@ def _profile(run_dir: Path, deny_read: list[Path], codepilot_home: Path, *, netw
     temp dirs, deny CodePilot+'s folder again (it may sit under a temp dir), then allow only this run's folders."""
     rd, cp = run_dir.resolve(), codepilot_home.resolve()
     run_rw = [rd / "sandbox", rd / "home", rd / ".venv"]
-    readable = [rd, Path(sys.base_prefix).resolve(), Path(sys.executable).resolve().parent]   # interpreter may live under ~
+    # interpreter and CodePilot's own environment may live under ~ (uv tool installs); packages only, no secrets
+    readable = [rd, Path(sys.base_prefix).resolve(), Path(sys.executable).resolve().parent, Path(sys.prefix).resolve()]
     lines = ["(version 1)", "(allow default)"]
     if not network:
         lines.append("(deny network*)")
