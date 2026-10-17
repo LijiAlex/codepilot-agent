@@ -1,0 +1,24 @@
+# codepilot.example.yml — copy to codepilot.yml (gitignored) and edit
+repos:
+  - owner: LijiAlex
+    name: layered-memory
+    test_command: "python -m pytest -q"
+    install_command: "pip install pytest"
+    protected_paths: [".claude-plugin/**", "plugins/*/.claude-plugin/**"]   # added to the defaults (version fields)
+    author_allowlist: [LijiAlex]
+  - owner: LijiAlex
+    name: codepilot-playground
+    test_command: "python -m pytest -q"
+    install_command: "pip install -e . pytest"
+    protected_paths: ["tests/test_contract_*.py"]        # the retry-gate contract test (Task 23)
+    author_allowlist: [LijiAlex]
+poll_interval_s: 300
+max_model_calls_per_run: 60      # per agent invocation; keeps one live run's spend bounded (Task 26 Step 8 checks the budget)
+max_tool_calls_per_run: 200
+complexity_threshold: 6
+solver_model: "anthropic:claude-sonnet-5-5"
+sandbox: daytona
+daytona_snapshot: null          # Daytona default image
+daytona_auto_stop_minutes: 30
+github_app_id_env: CODEPILOT_GH_APP_ID
+github_app_key_path_env: CODEPILOT_GH_APP_KEY_PATH

@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# scripts/with-env — run a command with the repo's .env loaded into its environment.
+# Usage: scripts/with-env codepilot | scripts/with-env python scripts/preflight.py
+# The values go straight into the child process; nothing is printed. CodePilot+ code never reads .env itself.
+set -euo pipefail
+root="$(cd "$(dirname "$0")/.." && pwd)"
+env_file="${CODEPILOT_ENV_FILE:-$root/.env}"
+if [ ! -f "$env_file" ]; then
+  echo "with-env: $env_file not found — run: cp .env.example .env  and fill in the keys" >&2
+  exit 2
+fi
+exec uv run --project "$root" --env-file "$env_file" "$@"

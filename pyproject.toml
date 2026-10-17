@@ -1,0 +1,50 @@
+[project]
+name = "codepilot-agent"
+version = "0.1.0"
+description = "CodePilot+: a multi-agent coding agent that turns GitHub issues into approved pull requests"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "deepagents==0.7.23",
+  "langchain-anthropic",
+  "langchain-openai",
+  "langchain-community",
+  "langgraph-checkpoint-sqlite",
+  "sqlite-vec",
+  "pygithub",
+  "textual",
+  "chromadb",
+  "langchain-daytona",
+  "httpx",
+  "pyyaml",
+  "pydantic",
+  "guardrail-eval-pipeline",
+  "fastapi",       # dashboard (Plus); already locked as a dependency of guardrail-eval-pipeline
+  "uvicorn",
+]
+
+[project.scripts]
+codepilot = "codepilot.cli:main"
+
+[project.optional-dependencies]
+# Plus, Task 32: JS/TS/Go symbols in the repo map. New packages approved by the user on 2026-10-17.
+maps = ["tree-sitter==0.26.0", "tree-sitter-javascript==0.25.0", "tree-sitter-typescript==0.23.2", "tree-sitter-go==0.25.0"]
+
+[dependency-groups]
+dev = ["pytest", "anyio", "pyjwt", "cryptography"]   # last two already locked via PyGithub; tests import them directly
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/codepilot"]
+
+[tool.uv]
+exclude-newer = "2026-10-09T00:00:00Z"
+
+[tool.uv.sources]
+guardrail-eval-pipeline = { git = "https://github.com/LijiAlex/guardrail-eval-pipeline", tag = "v0.2.0" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "."]
