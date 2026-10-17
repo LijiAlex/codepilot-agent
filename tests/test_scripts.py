@@ -1,0 +1,56 @@
+# tests/test_scripts.py
+import importlib.util
+from pathlib import Path
+
+import yaml
+
+from codepilot.audit import AuditLog
+from codepilot.db import connect
+from codepilot.runs import RunStore
+from codepilot.safety.injection import InjectionVerdict, StaticInjectionChecker
+from codepilot.states import RunState
+
+ROOT = Path(__file__).parent.parent
+
+
+def load(name):
+    spec = importlib.util.spec_from_file_location(name, ROOT / "scripts" / f"{name}.py")
+    mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+    return mod
+
+
+def test_issue_set_is_balanced_and_labelled():
+    items = yaml.safe_load((ROOT / "evals" / "issues.yaml").read_text())
+    assert len({i["id"] for i in items}) == len(items) == 27
+    assert {i["label"] for i in items} == {"benign", "malicious"}
+    assert sum(i["label"] == "malicious" for i in items) == 12
+
+
+def test_measure_counts_detection_false_alarms_and_fail_closed(tmp_path):
+    m = load("measure_guardrail")
+    items = yaml.safe_load((ROOT / "evals" / "issues.yaml").read_text())
+    res = m.measure(items, StaticInjectionChecker(m.STATIC_PHRASES))
+    assert res["false_alarms"] == 0 and 5 <= res["detected"] < res["malicious"]      # static phrases catch some, not all
+    m02 = next(r for r in res["rows"] if r["id"] == "m02")
+    assert m02["sanitised_changed"]                                                  # hidden comment stripped
+    m07 = next(r for r in res["rows"] if r["id"] == "m07")
+    assert m07["blocked"]                                                            # zero-width removed before checking
+
+    class Down:
+        def check(self, text): return InjectionVerdict(blocked=True, failed_closed=True, reasons=["unavailable"])
+    down = m.measure(items, Down())
+    assert down["detected"] == 0 and down["failed_closed"] == len(items)              # unavailable ≠ detection
+    out = tmp_path / "g.md"
+    assert m.main(["--checker", "static", "--issues", str(ROOT / "evals" / "issues.yaml"), "--out", str(out)]) == 0
+    assert "Malicious issues blocked" in out.read_text() and out.with_suffix(".json").exists()
+
+
+def test_scoreboard(tmp_path):
+    sb = load("scoreboard")
+    conn = connect(tmp_path / "cp.db")
+    runs, audit = RunStore(conn), AuditLog(conn)
+    r = runs.claim("o/r", "issue", 1, "t"); runs.update(r, task_type="bug_fix", pr_url="https://github.com/o/r/pull/3")
+    runs.set_state(r, RunState.DONE, "merged")
+    audit.log("agent:coder", "command_refused", run_id=r, target="git push", result="refused")
+    text = sb.scoreboard(conn)
+    assert "| PRs opened | 1 |" in text and "| PRs merged | 1 |" in text and "| Commands refused by the guard | 1 |" in text
