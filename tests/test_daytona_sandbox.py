@@ -118,3 +118,14 @@ def test_daytona_reinstall_runs_in_the_box_venv(tmp_path, mirror):
     h = prov.create("run1", "o", "r", sha, None)
     code, out = prov.reinstall(h, "echo $VIRTUAL_ENV && pwd")
     assert code == 0 and "/run/.venv" in out and out.strip().endswith("/run/sandbox")
+
+
+def test_change_capture_through_the_box_adapter(tmp_path, mirror):
+    from codepilot.changes import capture_changes
+    _, sha = mirror
+    prov, box_home = provider(tmp_path, FakeClient())
+    h = prov.create("run1", "o", "r", sha, None)
+    h.backend.write("/sandbox/pkg/new.py", "n = 1\n")
+    h.backend.edit("/sandbox/pkg/a.py", "x = 1", "x = 2")
+    saved = {s.path: s for s in capture_changes(h.backend, sha)}
+    assert saved["pkg/new.py"].content() == b"n = 1\n" and saved["pkg/a.py"].content() == b"x = 2\n"
