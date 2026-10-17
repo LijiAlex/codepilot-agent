@@ -67,6 +67,9 @@ class TestReport:
         return self.outcome in ("failed", "collection_error", "internal_error", "timeout")
 
 
+_PROGRESS = re.compile(r"^([.FEsxX]+)\s*(?:\[\s*\d+%\])?\s*$")
+
+
 def parse_pytest(output: str, exit_code: int) -> TestReport:
     """Parse `pytest -q -rfE` output (verified shapes: summary line 'N failed, M passed …', 'FAILED id - msg', exit 0/1/2/4/5)."""
     text = output
@@ -79,6 +82,13 @@ def parse_pytest(output: str, exit_code: int) -> TestReport:
         elif word == "failed": r.failed = n
         elif word.startswith("error"): r.errors = n
         elif word == "skipped": r.skipped = n
+    if not (r.passed or r.failed or r.errors or r.skipped):     # summary suppressed (repo addopts -q): count progress marks
+        for line in text.splitlines():
+            m = _PROGRESS.match(line)
+            if m:
+                marks = m.group(1)
+                r.passed += marks.count("."); r.failed += marks.count("F")
+                r.errors += marks.count("E"); r.skipped += marks.count("s")
     r.failing_ids = [m.group(2) for m in _SUMMARY.finditer(text)]
     return r
 

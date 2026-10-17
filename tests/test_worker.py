@@ -313,3 +313,12 @@ def test_recover_reopens_a_decision_interrupted_by_shutdown(env):
     assert s.handoffs.decide(hid, "approve", "liji")           # process dies here, before publish finishes
     Worker(s).recover()
     assert s.handoffs.get(hid)["status"] == "pending" and [h["id"] for h in s.handoffs.pending()] == [hid]
+
+
+def test_running_tests_from_the_shell_does_not_void_verification():
+    from codepilot.worker import _changes_files
+    assert not _changes_files({"name": "execute", "args": {"command": "cd sandbox && python -m pytest -q"}})
+    assert not _changes_files({"name": "execute", "args": {"command": "pytest -q tests/test_x.py | tail -5"}})
+    assert _changes_files({"name": "execute", "args": {"command": "cd sandbox && python gen.py"}})
+    assert _changes_files({"name": "edit_file", "args": {"file_path": "/sandbox/a.py"}})
+    assert not _changes_files({"name": "write_file", "args": {"file_path": "/shared/pr_draft.json"}})

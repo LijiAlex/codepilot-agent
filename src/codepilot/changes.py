@@ -56,9 +56,11 @@ def _stdout(output: str) -> str:
 
 
 def capture_changes(backend, base_sha: str) -> list[SavedFile]:
-    excludes = " ".join(shlex.quote(f":(exclude){j}") for j in JUNK)
-    # reset first: anything staged earlier (e.g. an agent's `git add .`) must not bypass the junk filter
-    r = backend.execute(f"cd sandbox && git reset -q && git add -A -- . {excludes} && "
+    junk = " ".join(shlex.quote(f":(glob){j}") + " " + shlex.quote(f":(glob){j}/**") for j in JUNK)
+    # reset first: anything staged earlier (e.g. an agent's `git add .`) must not bypass the junk filter. Junk is
+    # unstaged after `add` rather than excluded in it: an exclude pathspec naming a path the repo's own .gitignore
+    # already ignores makes `git add` exit 1 (seen live, 2026-10-17)
+    r = backend.execute(f"cd sandbox && git reset -q && git add -A -- . && git reset -q -- {junk} && "
                         f"git diff --cached --raw --no-renames -z {shlex.quote(base_sha)}")
     if r.exit_code != 0:
         raise ChangeCaptureError(f"git diff failed: {r.output[-1000:]}")

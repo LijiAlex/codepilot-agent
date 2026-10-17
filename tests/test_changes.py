@@ -95,3 +95,14 @@ def test_no_change_gives_empty_list(tmp_path):
     mirror, sha = make_mirror(tmp_path)
     _, backend = make_run(tmp_path, "run1", mirror, sha)
     assert capture_changes(backend, sha) == []
+
+
+def test_capture_works_when_the_repo_already_ignores_the_junk(tmp_path):
+    # live run 2026-10-17: `git add -A -- . ':(exclude).pytest_cache'` exits 1 when .gitignore already ignores it
+    mirror, sha = make_mirror(tmp_path)
+    (mirror / ".gitignore").write_text(".pytest_cache/\n__pycache__/\n")
+    git(mirror, "add", "."); git(mirror, "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "ignore")
+    sha = git(mirror, "rev-parse", "HEAD").strip()
+    repo, backend = make_run(tmp_path, "run9", mirror, sha)
+    edit_everything(repo)
+    assert {s.path for s in capture_changes(backend, sha)} == {"a.py", "b.py", "run.sh", "pkg/c.py", "bin.dat", "link.py"}

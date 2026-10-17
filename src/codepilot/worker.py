@@ -38,6 +38,11 @@ SLUG_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+){0,7}$")
 _READ_ONLY = {"git", "ls", "cat", "head", "tail", "grep", "find", "wc", "echo", "pwd", "tree", "diff", "sort", "uniq", "cd", "true"}
 
 
+def _runs_tests(argv: list[str]) -> bool:
+    prog = argv[0].rsplit("/", 1)[-1]
+    return prog == "pytest" or (prog in ("python", "python3") and argv[1:3] == ["-m", "pytest"])
+
+
 def _changes_files(data: dict) -> bool:
     """A tool call that may change the repository: file writes under /sandbox/, or a shell command that is not read-only."""
     name, args = data.get("name"), data.get("args") or {}
@@ -45,10 +50,10 @@ def _changes_files(data: dict) -> bool:
         return str(args.get("file_path", "")).startswith("/sandbox/")
     if name == "execute":
         try:
-            words = [w for seg in re.split(r"&&|\|\||;|\|", str(args.get("command", ""))) for w in shlex.split(seg)[:1]]
+            segs = [shlex.split(seg) for seg in re.split(r"&&|\|\||;|\|", str(args.get("command", "")))]
         except ValueError:
             return True
-        return any(w.rsplit("/", 1)[-1] not in _READ_ONLY for w in words)
+        return any(argv and argv[0].rsplit("/", 1)[-1] not in _READ_ONLY and not _runs_tests(argv) for argv in segs)
     return False
 
 class TimeLimitExceeded(RuntimeError):

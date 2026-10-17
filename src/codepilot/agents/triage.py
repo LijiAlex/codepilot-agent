@@ -6,6 +6,7 @@ from __future__ import annotations
 from typing import Literal
 
 from pydantic import BaseModel, Field
+from codepilot.agents.models import structured
 
 TaskType = Literal["bug_fix", "feature_addition", "dependency_update", "documentation", "config_change"]
 
@@ -52,7 +53,7 @@ class ComplexPlan(BaseModel):
 
 
 def _structured(model, schema, system: str, user: str, attempts: int = 2):
-    runnable = model.with_structured_output(schema)
+    runnable = structured(model, schema)
     last: Exception | None = None
     for _ in range(attempts):
         try:

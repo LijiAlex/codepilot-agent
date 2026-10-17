@@ -190,3 +190,11 @@ def test_verify_also_runs_protected_contract_tests(tmp_path):
     assert '"failed": 1' in out and "tests/test_contract_x.py::test_contract" in out and st.total_failures == 1
     out2 = tool.invoke({"purpose": "reproduce", "test_ids": ["tests/test_new.py"]})
     assert '"passed": 1' in out2                         # reproduce runs only what was asked
+
+
+def test_counts_from_progress_dots_when_the_repo_suppresses_the_summary():
+    # live run 2026-10-17: a repo whose addopts add -q prints no "N passed" line
+    from codepilot.agents.tools import parse_pytest
+    out = "." * 72 + " [ 61%]\n" + "." * 44 + "sF [100%]\n"
+    r = parse_pytest(out, 1)
+    assert (r.passed, r.skipped, r.failed) == (116, 1, 1)

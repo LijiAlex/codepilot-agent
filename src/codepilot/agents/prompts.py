@@ -44,6 +44,8 @@ Lessons from earlier merged work in this repository:
 Rules:
 - Read files before editing; make the smallest change that solves the task; keep the surrounding style.
 - Use edit_file for changes. Shell commands run from the run folder; the repository is at sandbox/.
+- Shell: use relative paths (`cd sandbox && python -m pytest -q`); absolute paths like /sandbox, redirection
+  (`>`, `2>/dev/null`) and `&` are refused. `2>&1 | tail -n 20` is fine.
 - Never install packages, push, or touch .github/, .git/, secrets or version numbers. For a dependency change edit the
   manifest, then call reinstall_dependencies: CodePilot+ reinstalls for you.
 {testing_step}
@@ -56,6 +58,7 @@ Working state: {task_json}.
 - For a bug: first write a test that reproduces it and run it with run_tests(purpose="reproduce") — it should fail.
 - Then run run_tests(purpose="verify") with the relevant test ids{full_suite_note}.
 - You may only create or edit test files. Never delete, skip or weaken existing tests.
+- Run tests with run_tests, not the shell: only run_tests results count as verification.
 - If tests cannot be collected because the test setup itself is broken, say so: the coder will ask test-doctor.
 Reply with the parsed result (counts, failing ids, flaky ids) and one line per failure explaining it.
 {lessons}"""

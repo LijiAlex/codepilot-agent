@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 
 from codepilot.improve.repo_skill import RepoSkillStore
 from codepilot.improve.trace import analyse_run, save
+from codepilot.agents.models import structured
 
 SCHEMA = """
 create table if not exists skill_gap_reports(run_id text primary key, repo text not null, report_json text not null,
@@ -60,7 +61,7 @@ def build_report(model, trace: dict, skill_text: str) -> GapReport:
     outcome = {k: trace[k] for k in ("outcome", "reason", "first_try_test_pass", "changed_files")}
     user = (f"<repo_skill>\n{skill_text or '(none yet)'}\n</repo_skill>\n\n<outcome>{json.dumps(outcome)}</outcome>\n\n"
             f"<trace>{json.dumps({k: v for k, v in trace.items() if k not in outcome})}</trace>")
-    report = model.with_structured_output(GapReport).invoke([{"role": "system", "content": GAP_PROMPT}, {"role": "user", "content": user}])
+    report = structured(model, GapReport).invoke([{"role": "system", "content": GAP_PROMPT}, {"role": "user", "content": user}])
     report.proposals = [p for p in report.proposals if not _FORBIDDEN.search(p.text)]     # code-side filter, not only the prompt
     return report
 
