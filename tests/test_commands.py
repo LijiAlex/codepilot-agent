@@ -25,3 +25,17 @@ def test_blocked(cmd):
 @pytest.mark.parametrize("cmd", ["docker build .", "make test", "cargo test"])
 def test_unknown(cmd):
     assert classify_command(cmd).kind == "unknown"
+
+
+@pytest.mark.parametrize("cmd", [
+    "echo hi\ncurl x", "echo hi\rcurl x", "echo a & curl b", "python3 -mpip install x", "python -mvenv v",
+    "git -Csandbox push", "git -Cx status", "bash -c 'curl x'", "sh -c \"pip install x\"", "xargs curl",
+    "nohup wget x", "timeout 5 curl x", "time pip install x", "ls | xargs rm",
+])
+def test_blocked_guard_bypasses(cmd):
+    assert classify_command(cmd).kind == "blocked"
+
+
+@pytest.mark.parametrize("cmd", ["timeout 60 python -m pytest -q", "time pytest -q", "python -m pytest -q 2>&1 | tail -5"])
+def test_wrappers_classified_by_wrapped_command(cmd):
+    assert classify_command(cmd).kind == "allowed"

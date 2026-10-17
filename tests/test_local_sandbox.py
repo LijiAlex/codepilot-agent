@@ -98,3 +98,19 @@ def test_real_home_files_are_unreadable_even_during_reinstall(tmp_path, mirror):
         prov.delete(h)
     finally:
         marker.unlink(missing_ok=True)
+
+
+@pytest.mark.skipif(shutil.which("sandbox-exec") is None, reason="local fallback uses macOS sandbox-exec")
+def test_macos_services_outside_the_sandbox_are_unreachable(tmp_path, mirror):
+    m, sha = mirror
+    home = tmp_path / "home"
+    prov = LocalSandboxProvider(home=home, mirror_root=home / "repos")
+    h = prov.create("run5", "o", "r", sha, install_command=None)
+    b = h.backend
+    try:
+        for cmd in ("/usr/bin/pbpaste", "/usr/bin/osascript -e 'return 1'", "/usr/bin/security list-keychains",
+                    "/usr/bin/open -R sandbox", "python -c \"import subprocess; subprocess.run(['/usr/bin/pbpaste'], check=True)\""):
+            assert b.execute(cmd).exit_code != 0, cmd
+        assert b.execute("python -c \"print(1)\" && git -C sandbox status --short").exit_code == 0     # ordinary work still runs
+    finally:
+        prov.delete(h)

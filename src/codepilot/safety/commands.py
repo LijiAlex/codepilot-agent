@@ -22,6 +22,8 @@ BLOCKED = {"curl", "wget", "ssh", "scp", "sftp", "nc", "sudo", "su", "claude", "
 FIND_BLOCKED = {"-delete", "-exec", "-execdir", "-ok", "-okdir", "-fprint", "-fprint0", "-fprintf", "-fls"}
 SENSITIVE = re.compile(r"(^|/)(\.env(\..*)?|.*\.pem|.*\.key|.*\.secret|.*credentials.*|id_rsa.*|\.ssh/.*|\.netrc|\.npmrc|\.pypirc)$")
 _SPLIT = re.compile(r"\s*(?:&&|\|\||;|\|)\s*")
+SHELLS = {"sh", "bash", "zsh", "dash"}
+WRAPPERS = {"time", "nohup", "xargs", "timeout"}          # classified by the command they run
 
 
 @dataclass
@@ -38,6 +40,17 @@ def _segment(seg: str) -> Classification:
     if not argv:
         return Classification("allowed", "empty")
     prog = argv[0].rsplit("/", 1)[-1]
+    if prog in WRAPPERS:
+        rest = argv[1:]
+        while rest and (rest[0].startswith("-") or (prog == "timeout" and rest[0][:1].isdigit())):
+            rest = rest[1:]
+        if not rest:
+            return Classification("blocked" if prog == "xargs" else "allowed", f"{prog} with no command")
+        return _segment(shlex.join(rest))
+    if prog in SHELLS:
+        if "-c" in argv and argv.index("-c") + 1 < len(argv):
+            return classify_command(argv[argv.index("-c") + 1])
+        return Classification("unknown", f"{prog} runs a script the guard cannot see")
     for a in argv[1:]:
         if a.startswith("/") or ".." in a.split("/"):
             return Classification("blocked", f"path outside the sandbox: {a}")
@@ -48,17 +61,17 @@ def _segment(seg: str) -> Classification:
     if prog == "rm" or (prog == "find" and FIND_BLOCKED & set(argv)):
         return Classification("blocked", "deleting or running files by shell is not allowed; use the file tools")
     if prog in {"python", "python3"}:
-        if "-c" in argv:
+        if "-c" in argv or any(a.startswith("-c") and not a.startswith("--") for a in argv[1:]):
             return Classification("blocked", "inline python is not allowed")
-        if "-m" in argv:
-            mod = argv[argv.index("-m") + 1] if argv.index("-m") + 1 < len(argv) else ""
-            if mod in {"pip", "ensurepip", "venv", "http.server"}:
+        mods = [argv[i + 1] for i, a in enumerate(argv[:-1]) if a == "-m"] + [a[2:] for a in argv[1:] if a.startswith("-m") and len(a) > 2]
+        for mod in mods:
+            if mod.split(".")[0] in {"pip", "ensurepip", "venv"} or mod == "http.server":
                 return Classification("blocked", f"python -m {mod} is not allowed")
     if prog == "uv":
         return Classification("blocked", "package changes go through the dependency file; code installs them")
     if prog == "git":
         sub = next((a for a in argv[1:] if not a.startswith("-") and a not in {"sandbox"}), "")
-        if "-C" in argv or sub in GIT_BLOCKED or any(a.startswith(("--output", "-o=")) for a in argv):
+        if any(a.startswith("-C") for a in argv[1:]) or sub in GIT_BLOCKED or any(a.startswith(("--output", "-o=")) for a in argv):
             return Classification("blocked", f"git {sub or '-C'} is not allowed")
         if sub and sub not in GIT_ALLOWED:
             return Classification("unknown", f"git {sub} is not on the allowed list")
@@ -69,6 +82,10 @@ def _segment(seg: str) -> Classification:
 
 
 def classify_command(cmd: str) -> Classification:
+    if "\n" in cmd or "\r" in cmd:
+        return Classification("blocked", "multi-line commands are not allowed; run one command at a time")
+    if re.search(r"(?<![&>])&(?![&>])", cmd):           # a lone & runs the next command in the background
+        return Classification("blocked", "background commands (&) are not allowed")
     if "$(" in cmd or "`" in cmd:
         return Classification("blocked", "command substitution is not allowed")
     if re.search(r"[<>]", re.sub(r"\d?>&\d", "", cmd)):     # any redirection except 2>&1-style stream joins

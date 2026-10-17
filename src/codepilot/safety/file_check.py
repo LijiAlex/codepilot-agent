@@ -59,7 +59,8 @@ def check_changes(changes: list[FileChange], expected: set[str], protected: list
         if p.startswith(("shared/", "conversation_history/", "large_tool_results/")):
             r.problems.append(f"working file must not be committed: {p}")
             continue
-        if not allowed_manifest and any(fnmatch.fnmatch(p, pat) for pat in protected):
+        if not allowed_manifest and any(fnmatch.fnmatch(p, pat) or (pat.startswith("**/") and fnmatch.fnmatch(p, pat[3:]))
+                                         for pat in protected):
             r.problems.append(f"protected path changed: {p}")
             continue
         if p.rsplit("/", 1)[-1] in MANIFESTS and task_type != "dependency_update":

@@ -116,7 +116,7 @@ def test_workflow_security_properties():
     review_checkouts = [s for s in jobs["review"]["steps"] if s.get("uses", "").startswith("actions/checkout")]
     assert review_checkouts and all(s["with"]["repository"] == "LijiAlex/codepilot-agent" for s in review_checkouts)
     for job in jobs.values():
-        assert job["if"] == "github.event.pull_request.head.repo.full_name == github.repository"
+        assert job["if"].startswith("github.event.pull_request.head.repo.full_name == github.repository")
         for s in job["steps"]:
             if "uses" in s:
                 assert re.fullmatch(r"[\w-]+/[\w-]+@[0-9a-f]{40}", s["uses"]), s["uses"]
@@ -127,3 +127,18 @@ def test_label_alone_does_not_make_a_pr_skip_human_approval():
     out = rv.run(FakeRepo(pr), 7, FakeClaude(responses=[tool_call("ReviewResult", REVIEW, "1")]), rv.TestSummary(passed=3),
                  "rev[bot]", "codepilot-plus[bot]")
     assert out["ready"] is False and "needs a human approval" in out["why"]
+
+
+def test_human_approval_at_a_reviewed_commit_rechecks_merge_ready_without_a_new_review():
+    body = rv.render_body(rv.ReviewResult(**{**REVIEW, "key_issues": []}), False, ["needs a human approval"], None, [])
+    pr = FakePR(reviews=[NS(user=NS(login="rev[bot]"), commit_id="h2", state="COMMENTED", body=body),
+                         NS(user=NS(login="alice"), commit_id="h2", state="APPROVED", body="")])
+    pr.user = NS(login="alice")
+    out = rv.run(FakeRepo(pr), 7, FakeClaude(responses=[]), rv.TestSummary(passed=3), "rev[bot]", "codepilot-plus[bot]")
+    assert out["ready"] and pr.added == ["merge-ready"] and pr.created == []
+
+
+def test_workflow_ignores_the_reviewers_own_reviews():
+    wf = yaml.safe_load((ROOT / "reviewer" / "workflow.yml").read_text())
+    for job in wf["jobs"].values():
+        assert "github.event.review.user.login != vars.REVIEWER_LOGIN" in job["if"]

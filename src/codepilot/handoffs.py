@@ -43,6 +43,16 @@ class HandoffStore:
     def mark(self, hid: str, status: str) -> None:
         self.conn.execute("update handoffs set status=? where id=?", (status, hid))
 
+    def reopen_interrupted(self) -> int:
+        """Startup: a decision whose run is still AWAITING_APPROVAL never finished (process stopped mid-publish or
+        mid-continuation) — put it back in the approval list. Safe to re-approve: the publish tools are idempotent."""
+        cur = self.conn.execute(
+            "update handoffs set status='pending', reason='reopened: interrupted by shutdown' where status in ('approved','rejected') "
+            "and run_id in (select id from runs where state='AWAITING_APPROVAL') "
+            "and rowid = (select max(rowid) from handoffs h2 where h2.run_id=handoffs.run_id)"      # only the run's latest item
+        )
+        return cur.rowcount
+
     def expire_for_issue(self, repo: str, issue_key: str, reason: str) -> int:
         cur = self.conn.execute(
             "update handoffs set status='expired', reason=? where repo=? and issue_key=? and status='pending'",

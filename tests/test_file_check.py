@@ -33,3 +33,9 @@ def test_docs_allowed_for_documentation_and_feature_and_no_tests_flag():
     assert check_changes(ch, {"pkg/a.py"}, [], "documentation").flags == []
     assert check_changes(ch, {"pkg/a.py"}, [], "bug_fix").flags == ["unexpected_file:README.md"]
     assert "no_tests_in_repo" in check_changes(ch, set(), [], "documentation", repo_had_no_tests=True).flags
+
+
+def test_protected_globs_match_at_repo_root():
+    for p in (".env", "server.pem", "credentials.json"):
+        r = check_changes([fc(p)], {p}, DEFAULT_PROTECTED, "bug_fix")
+        assert not r.ok and any("protected path" in m for m in r.problems), p

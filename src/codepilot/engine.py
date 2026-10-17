@@ -78,6 +78,9 @@ class Engine:
         self.poll_now.set()
         self.jobs.put(None)
         self.decisions.put(None)
+        for t in self.threads:                                 # let a publish in progress finish (startup reopens it if not)
+            if t.name == "_decision_loop":
+                t.join(timeout=30)
         self._save_session()
 
     # ---- actions from the TUI ----------------------------------------------

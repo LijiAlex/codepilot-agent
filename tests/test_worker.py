@@ -283,3 +283,33 @@ def test_recover_survives_a_provider_that_cannot_sweep(env):
         def sweep(self, keep): raise KeyError("DAYTONA_API_KEY")
     s.providers["daytona"] = NoKey()
     assert Worker(s).recover() == [] and env["provider"].swept == 1
+
+
+def test_edit_after_the_last_verify_is_not_offered_as_tested(env):
+    coder = [tool_call("edit_file", {"file_path": "/sandbox/pkg/slugs.py", "old_string": "return t.lower()",
+                                     "new_string": "return (t or '').lower()"}, "c1"),
+             tool_call("task", {"description": "test", "subagent_type": "test-agent"}, "c2"),
+             tool_call("edit_file", {"file_path": "/sandbox/pkg/slugs.py", "old_string": "return (t or '').lower()",
+                                     "new_string": "return (t or '').upper()"}, "c3"), AIMessage(content="done")]
+    s = services(env, base_scripts(coder=coder))
+    it = item(env); rid = claim(env, it)
+    assert Worker(s).run(it, rid).reason == "untested"
+
+
+def test_a_passing_reproduce_run_is_not_verification(env):
+    ta = [tool_call("write_file", {"file_path": "/sandbox/tests/test_empty.py", "content": EMPTY_TEST}, "t1"),
+          tool_call("run_tests", {"purpose": "reproduce"}, "t2"), AIMessage(content="2 passed")]
+    s = services(env, base_scripts(**{"test-agent": ta}))
+    it = item(env); rid = claim(env, it)
+    assert Worker(s).run(it, rid).reason == "untested"
+
+
+def test_recover_reopens_a_decision_interrupted_by_shutdown(env):
+    s = services(env, base_scripts())
+    rid = s.runs.claim("o/r", "issue", 9, "t")
+    for st in ("EXPLORING", "IMPLEMENTING", "TESTING", "AWAITING_APPROVAL"):
+        s.runs.set_state(rid, st)
+    hid = s.handoffs.create(rid, "o/r", "#9", "publish", {"x": 1})
+    assert s.handoffs.decide(hid, "approve", "liji")           # process dies here, before publish finishes
+    Worker(s).recover()
+    assert s.handoffs.get(hid)["status"] == "pending" and [h["id"] for h in s.handoffs.pending()] == [hid]

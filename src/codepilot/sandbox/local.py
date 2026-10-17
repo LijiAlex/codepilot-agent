@@ -19,6 +19,9 @@ from codepilot.sandbox.base import NONINTERACTIVE_ENV, SANDBOX_ROUTE, SHARED_ROU
 HOME = Path.home()
 DENY_READ = [HOME / ".secrets", HOME / ".ssh", HOME / ".config" / "gh", HOME / ".aws",
              HOME / "Library" / "Keychains", HOME / ".netrc", HOME / ".gitconfig"]
+SERVICE_TOOLS = ["open", "osascript", "pbpaste", "pbcopy", "security", "screencapture", "say", "launchctl"]
+SERVICE_NAMES = ["com.apple.pasteboard.1", "com.apple.coreservices.launchservicesd", "com.apple.SecurityServer",
+                 "com.apple.securityd", "com.apple.lsd.mapdb", "com.apple.coreservices.quarantine-resolver"]
 WRITABLE_SYSTEM = [Path("/private/tmp"), Path("/private/var/folders"), Path("/dev")]
 
 
@@ -33,6 +36,10 @@ def _profile(run_dir: Path, deny_read: list[Path], codepilot_home: Path, *, netw
     lines = ["(version 1)", "(allow default)"]
     if not network:
         lines.append("(deny network*)")
+    # (allow default) leaves macOS services reachable: clipboard, app launching (open hands URLs to apps outside the
+    # sandbox), AppleScript and the keychain. Agents never need them.
+    lines.append("(deny process-exec " + " ".join(f'(literal "/usr/bin/{t}")' for t in SERVICE_TOOLS) + ")")
+    lines.append("(deny mach-lookup " + " ".join(f'(global-name "{n}")' for n in SERVICE_NAMES) + ")")
     lines += [f'(deny file-read* (subpath "{Path(p).resolve()}"))' for p in [HOME, *deny_read]]
     lines += [f'(allow file-read* (subpath "{p}"))' for p in dict.fromkeys(readable)]
     # path resolution (realpath) stats each parent of an allowed folder; allow metadata only, never contents

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import re
+import shlex
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -34,6 +35,21 @@ from codepilot.states import RunState
 PHASE_ORDER = [RunState.TRIAGED, RunState.EXPLORING, RunState.IMPLEMENTING, RunState.TESTING]
 SLUG_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+){0,7}$")
 
+_READ_ONLY = {"git", "ls", "cat", "head", "tail", "grep", "find", "wc", "echo", "pwd", "tree", "diff", "sort", "uniq", "cd", "true"}
+
+
+def _changes_files(data: dict) -> bool:
+    """A tool call that may change the repository: file writes under /sandbox/, or a shell command that is not read-only."""
+    name, args = data.get("name"), data.get("args") or {}
+    if name in ("write_file", "edit_file"):
+        return str(args.get("file_path", "")).startswith("/sandbox/")
+    if name == "execute":
+        try:
+            words = [w for seg in re.split(r"&&|\|\||;|\|", str(args.get("command", ""))) for w in shlex.split(seg)[:1]]
+        except ValueError:
+            return True
+        return any(w.rsplit("/", 1)[-1] not in _READ_ONLY for w in words)
+    return False
 
 class TimeLimitExceeded(RuntimeError):
     pass
@@ -162,6 +178,8 @@ class Worker:
                 wm.update(relevant_files=files)
         elif e.kind == "tool_result" and e.data.get("name") == "show_diff":
             wm.update(diff_path="/shared/proposed_diff.txt")
+        elif e.kind == "tool_call" and _changes_files(e.data):
+            attempts.verified = None                               # a change after the last verify is untested
         elif e.kind == "tool_result" and e.data.get("name") == "run_tests" and attempts.last_report is not None:
             r = attempts.last_report
             wm.update(test_results={"outcome": r.outcome, "passed": r.passed, "failed": r.failed, "failing_ids": r.failing_ids},
@@ -318,7 +336,7 @@ class Worker:
             self._facts[run_id]["files"] = [x.path for x in saved]
             common = {"saved": to_payload(saved), "base_sha": base_sha, "triage": tr.model_dump(), **item.payload(),
                       "diff": unified_diff(mpath, base_sha, saved), "test_report":
-                      asdict(attempts.last_report) if attempts.last_report else None}
+                      asdict(attempts.verified or attempts.last_report) if (attempts.verified or attempts.last_report) else None}
             if translator.interrupts:
                 gate = translator.interrupts[0]
                 if gate["gate"] == "attempts_exhausted":
@@ -334,7 +352,7 @@ class Worker:
                 reason = "file_check: " + "; ".join(fc.problems)
                 self._failure_lesson(item, tr.task_type, reason, run_id)
                 return self._finish(rec, run_id, item, RunState.FAILED, reason[:300])
-            rep = attempts.last_report
+            rep = attempts.verified
             if rep is None or rep.outcome != "passed":
                 self._failure_lesson(item, tr.task_type, "the change was not shown to pass its tests", run_id)
                 return self._finish(rec, run_id, item, RunState.FAILED, "untested")
@@ -371,6 +389,7 @@ class Worker:
     def recover(self) -> list[str]:
         """Startup (spec §4.2): in-flight runs → FAILED(crashed), every leftover sandbox deleted."""
         ids = self.s.runs.recover_crashed()
+        self.s.handoffs.reopen_interrupted()
         for rid in ids:
             row = self.s.runs.get(rid)
             self.s.episodic.record_run(row["repo"], rid, row["issue_key"], "FAILED", "crashed", row["title"])

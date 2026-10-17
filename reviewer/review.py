@@ -148,6 +148,33 @@ def render_body(result: ReviewResult, ready: bool, why: list[str], since: str | 
     return "\n".join(lines)
 
 
+_SCORE = re.compile(r"\*\*Score:\*\* (\d+)/10")
+
+
+def _sync_label(pr, ready: bool) -> None:
+    labels = {label.name for label in pr.labels}
+    if ready and MERGE_READY not in labels:
+        pr.add_to_labels(MERGE_READY)
+    elif not ready and MERGE_READY in labels:
+        pr.remove_from_labels(MERGE_READY)
+
+
+def _recheck(pr, policy: dict, tests: TestSummary, bot_login: str, codepilot_login: str) -> dict:
+    """No new commits: re-apply the merge policy to this reviewer's last review at the head (no model call, no new review)."""
+    reviews = list(pr.get_reviews())
+    last = next((r for r in reversed(reviews) if r.user and r.user.login == bot_login and r.commit_id == pr.head.sha), None)
+    m = _SCORE.search(getattr(last, "body", "") or "") if last else None
+    if not m:
+        return {"skipped": "already reviewed at this commit"}
+    concerns = ["see review"] if "**Security concerns:**" in last.body else []
+    result = ReviewResult(summary="", score=int(m.group(1)), effort=1, security_concerns=concerns, key_issues=[], compliance="")
+    approvals = sum(1 for r in reviews if r.state == "APPROVED" and r.user and r.user.login != bot_login)
+    bot_pr = bool(codepilot_login) and pr.user is not None and pr.user.login == codepilot_login
+    ready, why = merge_ready(policy, result, tests, list(pr.get_files()), approvals, bot_pr)
+    _sync_label(pr, ready)
+    return {"rechecked": True, "ready": ready, "why": why}
+
+
 def run(repo, pr_number: int, model, tests: TestSummary, bot_login: str, codepilot_login: str = "") -> dict:
     pr = repo.get_pull(pr_number)
     base = pr.base.sha
@@ -160,8 +187,8 @@ def run(repo, pr_number: int, model, tests: TestSummary, bot_login: str, codepil
     except Exception:                                   # noqa: BLE001
         rules = ""
     files, since = review_files(repo, pr, bot_login)
-    if not files:
-        return {"skipped": "already reviewed at this commit"}
+    if not files:                                       # e.g. a human approval at a commit already reviewed
+        return _recheck(pr, policy, tests, bot_login, codepilot_login)
     m = CLOSES.search(pr.body or "")
     issue_text = ""
     if m:
@@ -186,11 +213,7 @@ def run(repo, pr_number: int, model, tests: TestSummary, bot_login: str, codepil
     ready, why = merge_ready(policy, result, tests, list(pr.get_files()), approvals, bot_pr)
     pr.create_review(commit=repo.get_commit(pr.head.sha), body=render_body(result, ready, why, since, extra),
                      event="COMMENT", comments=inline)
-    labels = {label.name for label in pr.labels}
-    if ready and MERGE_READY not in labels:
-        pr.add_to_labels(MERGE_READY)
-    elif not ready and MERGE_READY in labels:
-        pr.remove_from_labels(MERGE_READY)
+    _sync_label(pr, ready)
     return {"score": result.score, "ready": ready, "why": why, "inline": len(inline)}
 
 

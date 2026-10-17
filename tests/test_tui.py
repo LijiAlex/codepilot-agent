@@ -92,3 +92,17 @@ async def test_new_task_skip_logs_and_quit():
         await pilot.press("escape")
         await pilot.press("q")
         assert "shutdown" in eng.calls
+
+
+@pytest.mark.anyio
+async def test_markup_in_untrusted_text_is_shown_literally():
+    a, eng = app()
+    evil = "fix [/] bug [link=http://x]x[/link]"
+    eng.state["runs"][0]["title"] = evil
+    eng.state["runs"][0]["reason"] = "[bold]r[/]"
+    if eng.state.get("current"):
+        eng.state["current"]["title"] = evil
+    async with a.run_test(size=(140, 40)) as pilot:
+        await pilot.pause()
+        table = a.query_one("#issues")
+        assert evil[:40] in str(table.get_row_at(0)[1])

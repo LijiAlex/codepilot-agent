@@ -7,6 +7,7 @@ from collections import deque
 from typing import Callable
 
 from rich.markup import escape
+from rich.text import Text
 from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -130,11 +131,11 @@ class CodePilotApp(App):
         for r in v["runs"]:
             icon = STATE_ICON.get(r["state"], "●")
             status = f"{icon} {r['state'].lower().replace('_', ' ')}" + (f" ({r['reason']})" if r.get("reason") else "")
-            table.add_row(r["issue_key"], r["title"][:40], status)
+            table.add_row(Text(r["issue_key"]), Text(r["title"][:40]), Text(status))   # issue text is untrusted: never markup
             self.issue_rows.append(r)
         for key, why in v["skipped"].items():                # "owner/name#N" → why the last poll skipped it
             repo, num = key.split("#", 1)
-            table.add_row(f"#{num}", "", f"skipped: {why}")
+            table.add_row(Text(f"#{num}"), "", Text(f"skipped: {why}"))
             self.issue_rows.append({"repo": repo, "issue_key": f"#{num}"})
         approvals = self.query_one("#approvals", ListView)
         approvals.clear()
@@ -143,7 +144,7 @@ class CodePilotApp(App):
             label = f"⚠ {h['repo']} {h['issue_key']}: {ENTRY_LABEL.get(h['entry_point'], h['entry_point'])}"
             if "more_than_5_files" in h.get("flags", []):          # brief gate: commit touching more than 5 files (E18)
                 label += f" — commit touches {h.get('file_count', '?')} files (>5-file gate)"
-            approvals.append(ListItem(Label(label)))
+            approvals.append(ListItem(Label(Text(label))))
         self._current = v["current"]
         self._render_task()
 
@@ -155,9 +156,9 @@ class CodePilotApp(App):
             return
         todos = self.todos.get(cur["id"], [])
         todo_lines = "\n".join(f"  [{'✓' if t.get('status') == 'completed' else ' '}] {t.get('content', '')}" for t in todos)
-        box.update(f"{cur['issue_key']}: {cur['title']}\nStatus: {cur['state']}\n"
-                   f"Agent: {self.last_agent.get(cur['id'], '-')} (retry {cur.get('attempts') or 0}/3)\n"
-                   f"Skill: {cur.get('skill') or '-'}\nTodo:\n{todo_lines or '  (not planned yet)'}")
+        box.update(Text(f"{cur['issue_key']}: {cur['title']}\nStatus: {cur['state']}\n"
+                        f"Agent: {self.last_agent.get(cur['id'], '-')} (retry {cur.get('attempts') or 0}/3)\n"
+                        f"Skill: {cur.get('skill') or '-'}\nTodo:\n{todo_lines or '  (not planned yet)'}"))
 
     # ---- actions -----------------------------------------------------------
     def _selected_handoff(self) -> dict | None:

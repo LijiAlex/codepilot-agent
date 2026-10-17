@@ -13,7 +13,7 @@ env:
 jobs:
   tests:
     # Job A runs the PR's code: read-only token, no secrets, no stored credentials. Fork PRs are skipped (documented).
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.review.user.login != vars.REVIEWER_LOGIN
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -34,7 +34,7 @@ jobs:
   review:
     # Job B holds the secrets and never checks out or runs the PR's code: it reads the diff through the API.
     needs: tests
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.review.user.login != vars.REVIEWER_LOGIN
     runs-on: ubuntu-latest
     permissions: {}
     steps:

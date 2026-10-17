@@ -89,6 +89,7 @@ class AttemptState:
     prior_failures: int = 0
     failures_this_run: int = 0
     last_report: TestReport | None = None
+    verified: TestReport | None = None             # last purpose="verify" report; cleared by any later change (worker)
     saw_no_tests: bool = False                     # pytest exit 5 seen: the repo had no tests (E6 flag)
 
     @property
@@ -142,6 +143,8 @@ def make_run_tests_tool(backend, test_command: str, task_type: str, state: Attem
             if again.outcome == "passed":
                 rep.flaky_ids, rep.failing_ids, rep.outcome = rep.failing_ids, [], "passed"
         state.last_report = rep
+        if purpose == "verify":
+            state.verified = rep
         if rep.outcome == "no_tests":
             state.saw_no_tests = True
         hint = ""
