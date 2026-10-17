@@ -1,0 +1,71 @@
+# reviewer/workflow.yml — a person copies this to .github/workflows/codepilot-review.yml in the target repo
+# (CodePilot+ itself may not edit .github/). Actions are pinned to commit SHAs at least 7 days old (checked 2026-10-17).
+name: CodePilot+ independent review
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+  pull_request_review:                          # a human approval can make a reviewed PR merge-ready
+    types: [submitted]
+permissions: {}
+env:
+  INSTALL: "pip install -e . pytest"            # layered-memory: "pip install pytest"
+  TESTS: "python -m pytest -q --junitxml=junit.xml"
+jobs:
+  tests:
+    # Job A runs the PR's code: read-only token, no secrets, no stored credentials. Fork PRs are skipped (documented).
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - run: ${{ env.INSTALL }}
+      - run: ${{ env.TESTS }} || true            # failures are data for the reviewer, not a job failure
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: junit
+          path: junit.xml
+          if-no-files-found: warn
+  review:
+    # Job B holds the secrets and never checks out or runs the PR's code: it reads the diff through the API.
+    needs: tests
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        id: app
+        with:
+          app-id: ${{ vars.REVIEWER_APP_ID }}
+          private-key: ${{ secrets.REVIEWER_APP_KEY }}
+          repositories: ${{ github.event.repository.name }}
+          permission-pull-requests: write
+          permission-issues: write
+          permission-contents: read
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: LijiAlex/codepilot-agent
+          ref: v1.0.0                           # Task 28 Step 3: replace with the tag's full commit SHA once it exists
+          path: cp
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - run: pip install -r cp/reviewer/requirements.txt
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: junit
+        continue-on-error: true
+      - run: python cp/reviewer/review.py
+        env:
+          REVIEWER_TOKEN: ${{ steps.app.outputs.token }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          REVIEWER_MODEL: gpt-6.1-sol
+          REVIEWER_LOGIN: ${{ vars.REVIEWER_LOGIN }}
+          CODEPILOT_LOGIN: ${{ vars.CODEPILOT_LOGIN }}
+          JUNIT: junit.xml
