@@ -12,7 +12,7 @@ from pathlib import Path
 
 def _chat_model(name: str):
     from langchain.chat_models import init_chat_model          # direct, so this works right after Task 1
-    return init_chat_model(name, temperature=0, max_tokens=8, timeout=60)
+    return init_chat_model(name, max_tokens=8, timeout=60)
 
 
 def check_model(settings) -> tuple[str, str]:

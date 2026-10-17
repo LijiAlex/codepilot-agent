@@ -9,7 +9,7 @@ from deepagents._models import get_model_provider
 def make_model(name: str, *, max_tokens: int = 8192):
     """name like 'anthropic:claude-sonnet-5-5'. Reads the provider key from the environment (never from a file)."""
     from langchain.chat_models import init_chat_model
-    return init_chat_model(name, temperature=0, max_tokens=max_tokens, max_retries=2, timeout=180)
+    return init_chat_model(name, max_tokens=max_tokens, max_retries=2, timeout=180)   # default temperature: Claude 5 models reject others
 
 
 def register_profiles(model) -> str:
