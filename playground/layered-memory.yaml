@@ -1,0 +1,117 @@
+# playground/layered-memory.yaml — genuine issues for LijiAlex/layered-memory (real plugin, stdlib-only, 117 tests).
+# Each was reproduced on main before drafting (Task 24 Step 1 shows the reproduction). Filed only after the user approves.
+- key: transcript-non-object-line
+  type: bug_fix
+  expect: pr
+  labels: [ai-assignable]
+  title: "read_transcript crashes on a JSON line that is not an object"
+  body: |
+    `transcripts.read_transcript` skips lines that are not valid JSON, but a valid JSON line that is not an object
+    (for example `[1, 2]` or `"text"`, which a truncated or foreign .jsonl can contain) raises
+    `AttributeError: 'list' object has no attribute 'get'` and aborts `/memory:build` for every later transcript.
+    Such lines should be skipped like invalid JSON.
+  hidden:
+    path: tests/test_hidden_transcript_lines.py
+    content: |
+      from transcripts import read_transcript
+
+      def test_non_object_lines_are_skipped(tmp_path):
+          p = tmp_path / "s.jsonl"
+          p.write_text('[1, 2]\n"text"\n42\n{"message": {"role": "user", "content": "hi"}}\n')
+          assert read_transcript(p) == ("s", "user: hi")
+  reference:
+    - file: plugins/layered-memory/scripts/transcripts.py
+      old: |2
+                except json.JSONDecodeError:
+                    continue
+                msg = row.get("message")
+      new: |2
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(row, dict):
+                    continue
+                msg = row.get("message")
+
+- key: config-unreadable
+  type: bug_fix
+  expect: pr
+  labels: [ai-assignable]
+  title: "load_config crashes when config.json cannot be read"
+  body: |
+    `load_config` documents "Bad/missing → DEFAULTS", but only catches a missing file and invalid JSON. A config.json
+    that is not UTF-8 (`UnicodeDecodeError`), is a directory (`IsADirectoryError`) or is not readable
+    (`PermissionError`) crashes every hook instead of falling back to the defaults.
+  hidden:
+    path: tests/test_hidden_config_unreadable.py
+    content: |
+      from config import DEFAULTS, load_config
+
+      def test_directory_falls_back(tmp_path):
+          (tmp_path / "config.json").mkdir()
+          assert load_config(tmp_path) == DEFAULTS
+
+      def test_bad_bytes_fall_back(tmp_path):
+          (tmp_path / "config.json").write_bytes(b"\xff\xfe{")
+          assert load_config(tmp_path) == DEFAULTS
+  reference:
+    - file: plugins/layered-memory/scripts/config.py
+      old: "    except (FileNotFoundError, json.JSONDecodeError):"
+      new: "    except (OSError, UnicodeDecodeError, json.JSONDecodeError):"
+
+- key: slug-accents
+  type: feature_addition
+  expect: pr
+  labels: [ai-assignable]
+  title: "Keep accented letters in theme slugs instead of turning them into dashes"
+  body: |
+    `normalize_slug("Café Ünïcode")` returns `caf-n-code`: every non-ASCII letter becomes a dash, so themes about
+    accented words get unreadable slugs. Fold accents first (é→e, ü→u) with the standard library, so it returns
+    `cafe-unicode`. Text with no Latin letters at all may still become `unsorted`.
+  hidden:
+    path: tests/test_hidden_slug_accents.py
+    content: |
+      from slugs import normalize_slug
+
+      def test_accents_are_folded():
+          assert normalize_slug("Café Ünïcode") == "cafe-unicode"
+          assert normalize_slug("naïve façade") == "naive-facade"
+
+      def test_existing_behaviour_kept():
+          assert normalize_slug("Hello_World  Again") == "hello-world-again"
+          assert normalize_slug("") == "unsorted"
+  reference:
+    - file: plugins/layered-memory/scripts/slugs.py
+      old: |
+        import re
+      new: |
+        import re
+        import unicodedata
+    - file: plugins/layered-memory/scripts/slugs.py
+      old: '    s = (s or "").lower()'
+      new: '    s = unicodedata.normalize("NFKD", s or "").encode("ascii", "ignore").decode().lower()'
+
+- key: readme-config-options
+  type: documentation
+  expect: pr
+  labels: [ai-assignable]
+  title: "README: document every config.json option"
+  body: |
+    The README's Config section lists 11 of the 27 options in `config.DEFAULTS`. Document the other 16
+    (scopes, summary_max_lines, index_max_lines, writeup_model, transcript_dir, nudge_idle_turns,
+    writeup_lock_timeout_sec, writeup_call_timeout_sec, reconcile_cluster_threshold, reconcile_cluster_max,
+    writeup_max_themes_inline, scratch_stale_after_min, reconcile_schedule, reconcile_min_interval_hours,
+    history_keep_per_theme, unsorted_soft_cap) with their defaults and what they do.
+  hidden:
+    path: tests/test_hidden_readme_config.py
+    content: |
+      from pathlib import Path
+
+      from config import DEFAULTS
+
+      def test_every_option_documented():
+          readme = (Path(__file__).parent.parent / "README.md").read_text()
+          sec = readme[readme.index("### Config"):]
+          end = sec.find("\n## ", 1)
+          sec = sec if end == -1 else sec[:end]
+          assert [k for k in DEFAULTS if k not in sec] == []
+  reference: null
