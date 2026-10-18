@@ -105,7 +105,7 @@ def cmd_once(args) -> int:
                                              on_event=lambda e: print(f"[{e.agent}] {e.text}") if args.verbose and e.kind != "token" else None),
                        path.parent)
     eng.startup()
-    eng.start()
+    eng.start(poll_loop=False)          # one poll, here: a second poller would race this one (live 2026-10-18)
     eng.poll_once()
     ok = eng.wait_idle(args.timeout)
     eng.shutdown()

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import sqlite3
+import threading
 from pathlib import Path
 
 SCHEMA = """
@@ -32,10 +33,51 @@ create trigger if not exists events_no_delete before delete on events
 """
 
 
+class Result:
+    """A fully read query result: no cursor outlives the lock, so another thread can never interleave with it."""
+    __slots__ = ("_rows", "rowcount", "lastrowid", "_i")
+
+    def __init__(self, rows: list, rowcount: int, lastrowid: int | None):
+        self._rows, self.rowcount, self.lastrowid, self._i = rows, rowcount, lastrowid, 0
+
+    def fetchone(self):
+        if self._i >= len(self._rows):
+            return None
+        self._i += 1
+        return self._rows[self._i - 1]
+
+    def fetchall(self) -> list:
+        rest, self._i = self._rows[self._i:], len(self._rows)
+        return rest
+
+    def __iter__(self):
+        return iter(self.fetchall())
+
+
+class LockedConnection(sqlite3.Connection):
+    """One connection shared by the TUI, worker, decision and poll threads. Python's sqlite3 does not support
+    concurrent use of one connection (live: "InterfaceError: bad parameter or other API misuse"), so every statement
+    runs under a lock and its rows are read before the lock is released."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._lock = threading.RLock()
+
+    def execute(self, sql, parameters=(), /):
+        with self._lock:
+            cur = super().execute(sql, parameters)
+            rows = cur.fetchall() if cur.description else []
+            return Result(rows, cur.rowcount, cur.lastrowid)
+
+    def executescript(self, script, /):
+        with self._lock:
+            return super().executescript(script)
+
+
 def connect(path: Path) -> sqlite3.Connection:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(path, check_same_thread=False, isolation_level=None)
+    conn = sqlite3.connect(path, check_same_thread=False, isolation_level=None, factory=LockedConnection)
     conn.row_factory = sqlite3.Row
     conn.execute("pragma journal_mode=wal")
     conn.execute("pragma busy_timeout=5000")

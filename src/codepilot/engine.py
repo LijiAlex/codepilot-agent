@@ -79,8 +79,10 @@ class Engine:
                 self.ui.on_notice(note)
         return crashed
 
-    def start(self) -> None:
-        for target in (self._worker_loop, self._decision_loop, self._poll_loop):
+    def start(self, poll_loop: bool = True) -> None:
+        """poll_loop=False for headless `once`, which polls exactly once on the calling thread."""
+        loops = (self._worker_loop, self._decision_loop) + ((self._poll_loop,) if poll_loop else ())
+        for target in loops:
             t = threading.Thread(target=target, daemon=True, name=target.__name__)
             t.start()
             self.threads.append(t)

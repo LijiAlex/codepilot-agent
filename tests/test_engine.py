@@ -114,3 +114,19 @@ def test_startup_session_note_is_one_short_line_without_empty_sessions():
     note = session_note([{"summary": "no runs"}, {"summary": "FAILED(setup: box command failed (1): cd …\nObtaining file:///x\n  noise): 1"},
                          {"summary": "PR_OPENED: 2"}])
     assert "\n" not in note and "no runs" not in note and "PR_OPENED: 2" in note and len(note) <= 200
+
+
+def test_headless_once_does_not_start_a_second_poller(tmp_path, monkeypatch):
+    import codepilot.cli as cli
+    started = {}
+    class FakeEngine:
+        def startup(self): pass
+        def start(self, poll_loop=True): started["poll_loop"] = poll_loop
+        def poll_once(self): started["polled"] = True
+        def wait_idle(self, t): return True
+        def shutdown(self): pass
+        def view(self): return {"runs": []}
+    monkeypatch.setattr("codepilot.bootstrap.build_engine", lambda *a, **k: FakeEngine())
+    cfg = tmp_path / "codepilot.yml"; cfg.write_text(f"repos:\n  - owner: o\n    name: r\nhome: {tmp_path / 'h'}\n")
+    assert cli.main(["--config", str(cfg), "once"]) == 0
+    assert started == {"poll_loop": False, "polled": True}            # exactly one poll, on the main thread
