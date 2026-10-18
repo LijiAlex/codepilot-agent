@@ -178,3 +178,19 @@ def test_reviewer_model_uses_the_default_temperature():
     src = (ROOT / "reviewer" / "review.py").read_text()
     line = next(l for l in src.splitlines() if "ChatOpenAI(" in l).split("#")[0]      # code only, not the comment
     assert "temperature" not in line
+
+
+def test_a_human_approval_clears_needs_review():
+    body = rv.render_body(rv.ReviewResult(**{**REVIEW, "key_issues": []}), True, [], None, [])
+    pr = FakePR(reviews=[NS(user=NS(login="rev[bot]"), commit_id="h2", state="COMMENTED", body=body),
+                         NS(user=NS(login="alice"), commit_id="h2", state="APPROVED", body="")],
+                labels=["codepilot-generated", "needs-review", "codepilot-review-completed"])
+    rv.run(FakeRepo(pr), 7, FakeClaude(responses=[]), rv.TestSummary(passed=3), "rev[bot]", "codepilot-plus[bot]")
+    assert "needs-review" in pr.removed                                # a person reviewed it: the brief's label is done
+
+
+def test_needs_review_stays_without_a_human_approval():
+    pr = FakePR(labels=["codepilot-generated", "needs-review", "codepilot-review-pending"])
+    rv.run(FakeRepo(pr), 7, FakeClaude(responses=[tool_call("ReviewResult", REVIEW, "1")]), rv.TestSummary(passed=3),
+           "rev[bot]", "codepilot-plus[bot]", force=True)
+    assert "needs-review" not in pr.removed
