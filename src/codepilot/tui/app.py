@@ -256,6 +256,21 @@ class CodePilotApp(App):
         if h:
             self.push_screen(InspectScreen(self.engine.inspect(h["id"])))
 
+    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
+        """Enter / click on an issue row: show that run's recorded log (it may have run in another process)."""
+        if event.data_table.id != "issues" or not 0 <= event.cursor_row < len(self.issue_rows):
+            return
+        row = self.issue_rows[event.cursor_row]
+        if not row.get("id"):
+            return
+        log = self.query_one("#logs", RichLog)
+        log.clear()
+        log.write(Text(f"— past log of {row['repo']} {row['issue_key']} (run {row['id']}) —", style="bold yellow"))
+        for e in self.engine.run_log(row["id"]):
+            kind = "error" if e.get("kind") == "tool_result" and (e.get("data") or {}).get("status") == "error" else e.get("kind", "")
+            log.write(f"[{KIND_STYLE.get(kind, 'white')}]\\[{escape(str(e.get('agent', '')))}][/] {escape(str(e.get('text', ''))[:400])}")
+        log.write(Text("— end of past log; live runs continue below —", style="bold yellow"))
+
     def on_list_view_selected(self, event: ListView.Selected) -> None:
         self.action_inspect()
 

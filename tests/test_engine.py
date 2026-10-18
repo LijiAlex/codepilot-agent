@@ -2,6 +2,9 @@
 import time
 from types import SimpleNamespace as NS
 
+import json
+from pathlib import Path
+
 import pytest
 from langchain_core.messages import AIMessage
 
@@ -130,3 +133,16 @@ def test_headless_once_does_not_start_a_second_poller(tmp_path, monkeypatch):
     cfg = tmp_path / "codepilot.yml"; cfg.write_text(f"repos:\n  - owner: o\n    name: r\nhome: {tmp_path / 'h'}\n")
     assert cli.main(["--config", str(cfg), "once"]) == 0
     assert started == {"poll_loop": False, "polled": True}            # exactly one poll, on the main thread
+
+
+def test_run_log_returns_the_last_lines_of_a_finished_run(env):
+    e, ui = engine(env)
+    run_dir = Path(env["settings"].home) / "runs" / "abc123"
+    run_dir.mkdir(parents=True)
+    with (run_dir / "events.jsonl").open("w") as f:
+        for i in range(250):
+            f.write(json.dumps({"run_id": "abc123", "kind": "message", "agent": "coder", "text": f"line {i}", "data": {}}) + "\n")
+        f.write("not json\n")                                          # a torn last line must not break it
+    log = e.run_log("abc123", limit=200)
+    assert len(log) == 200 and log[-1]["text"] == "line 249" and log[0]["text"] == "line 50"
+    assert e.run_log("nope") == []

@@ -12,6 +12,7 @@ import threading
 import uuid
 from collections import Counter
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Callable
 
 from codepilot.continuations import ContinuationServices, decide, describe, skip
@@ -204,6 +205,21 @@ class Engine:
             self.poll_now.clear()
 
     # ---- read model for the TUI ----------------------------------------------
+    def run_log(self, run_id: str, limit: int = 200) -> list[dict]:
+        """The last lines of a run's recorded events (runs done elsewhere, e.g. by `codepilot once`)."""
+        f = Path(self.settings.home) / "runs" / run_id / "events.jsonl"
+        if not f.exists():
+            return []
+        out = []
+        for line in f.read_text(errors="replace").splitlines():
+            try:
+                e = json.loads(line)
+            except ValueError:
+                continue
+            if e.get("kind") != "token":
+                out.append(e)
+        return out[-limit:]
+
     def view(self) -> dict:
         runs = self.worker.s.runs
         cur = runs.get(self.current_run) if self.current_run else None

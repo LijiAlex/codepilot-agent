@@ -192,3 +192,16 @@ async def test_new_task_dialog_is_centred_and_labels_every_field():
         assert abs((box.x + box.width / 2) - 70) <= 3                # centred horizontally
         labels = " ".join(str(l.render()) for l in a.screen.query(Label))
         assert "Repository" in labels and "Title" in labels and "What should change" in labels
+
+
+@pytest.mark.anyio
+async def test_selecting_an_issue_row_shows_that_runs_past_log():
+    a, eng = app()
+    eng.run_log = lambda rid, limit=200: [{"agent": "coder", "kind": "message", "text": "edited slugs.py"},
+                                          {"agent": "test-agent", "kind": "tool_result", "text": "2 passed"}]
+    async with a.run_test(size=(140, 40)) as pilot:
+        await pilot.pause()
+        t = a.query_one("#issues", DataTable); t.focus(); t.move_cursor(row=0); await pilot.pause()
+        await pilot.press("enter"); await pilot.pause()
+        text = "\n".join(str(line.text) for line in a.query_one("#logs", RichLog).lines)
+        assert "past log" in text and "edited slugs.py" in text and "2 passed" in text
