@@ -37,6 +37,7 @@ class DashboardDeps:
     improvements: Any = None                    # Task 30: ImprovementStore
     map_budget: int = 4000                      # Settings.repo_map_budget_tokens
     cost_tracked: bool = False                  # both model prices set in codepilot.yml
+    trace_costs: Callable[[], dict] | None = None   # run_id -> USD from LangSmith (cached by the caller)
 
 
 class PRAction(BaseModel):
@@ -73,13 +74,21 @@ def create_app(deps: DashboardDeps, token: str, port: int) -> FastAPI:
 
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
+    def _trace_costs() -> dict | None:
+        if deps.trace_costs is None:
+            return None
+        try:
+            return deps.trace_costs()
+        except Exception:                                  # noqa: BLE001 — LangSmith down: the page still loads
+            return None
+
     @app.get("/api/overview")
     def overview():
-        return data.overview(deps.conn, deps.cost_tracked)
+        return data.overview(deps.conn, deps.cost_tracked, _trace_costs())
 
     @app.get("/api/matrix")
     def matrix():
-        return data.matrix(deps.conn, deps.runs_dir)
+        return data.matrix(deps.conn, deps.runs_dir, _trace_costs())
 
     @app.get("/api/runs/{run_id}")
     def run(run_id: str):

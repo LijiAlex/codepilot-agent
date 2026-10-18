@@ -230,3 +230,29 @@ def test_friendly_summary_handles_nested_brackets_and_newlines():
         "console.log(friendlySummary('FAILED(setup: box command failed (1): cd …\\nObtaining file:///x\\n  Checking if build backen): 1 | PR_OPENED: 2'))"
     out = subprocess.run(["node", "-e", prog], capture_output=True, text=True, check=True).stdout.strip()
     assert out.startswith("failed (setup: box command failed (1): cd") and out.endswith("×1 | PR opened ×2") and "FAILED" not in out
+
+
+def test_cost_comes_from_langsmith_traces_matched_by_run_id(env):
+    from codepilot.dashboard import data
+    class FakeLS:
+        def list_runs(self, **kw):
+            assert kw["project_name"] == "codepilot-plus" and kw["is_root"] is True
+            return [NS(extra={"metadata": {"run_id": env.rid}}, total_cost=0.1234),
+                    NS(extra={"metadata": {"run_id": env.rid}}, total_cost=0.0100),    # a continuation of the same run
+                    NS(extra={"metadata": {}}, total_cost=9.0)]                       # not ours: ignored
+    costs = data.langsmith_costs(FakeLS(), "codepilot-plus")
+    assert costs == {env.rid: 0.1334}
+    ov = data.overview(env.conn, cost_tracked=False, trace_costs=costs)
+    assert ov["cost_usd"] == 0.13 and ov["cost_source"] == "LangSmith"
+    row = data.matrix(env.conn, env.runs_dir if hasattr(env, "runs_dir") else Path("/nonexistent"), trace_costs=costs)["rows"][0]
+    assert row["cost_usd"] == 0.1334
+
+
+def test_dashboard_uses_trace_costs_when_available_and_survives_langsmith_errors(env, tmp_path):
+    from codepilot.dashboard.app import DashboardDeps, create_app
+    base = dict(conn=env.conn, runs_dir=tmp_path, results_dir=tmp_path, repos=["o/r"], repo_factory=lambda n: env.repo, audit=None)
+    ok = TestClient(create_app(DashboardDeps(**base, trace_costs=lambda: {env.rid: 0.5}), TOKEN, PORT))
+    assert ok.get("/api/overview", headers=H).json()["cost_usd"] == 0.5
+    def down(): raise RuntimeError("langsmith unreachable")
+    bad = TestClient(create_app(DashboardDeps(**base, trace_costs=down), TOKEN, PORT))
+    assert bad.get("/api/overview", headers=H).json()["cost_usd"] is None      # page still loads

@@ -77,17 +77,18 @@ const render = {
     [["Runs", num(d.runs)], ["PRs opened", num(d.prs_opened)], ["Runs waiting for approval (TUI)", num(d.pending_decisions)],
      ["Skill changes waiting (Improvements)", num(d.proposals_waiting)], ["Commands refused", num(d.commands_refused)],
      ["Issues blocked", num(d.issues_blocked)], ["Tokens in / out", num(d.tokens_in) + " / " + num(d.tokens_out)],
-     ["Cost (USD)", d.cost_usd === null ? "not tracked" : "$" + d.cost_usd]]
+     ["Cost (USD)" + (d.cost_source ? " — " + d.cost_source : ""), d.cost_usd === null ? "not tracked" : "$" + d.cost_usd]]
       .forEach(([k, v]) => { const c = el("div", null, "card"); c.appendChild(el("b", v)); c.appendChild(el("span", k, "muted")); cards.appendChild(c); });
     m.appendChild(cards);
-    if (d.cost_usd === null) m.appendChild(el("p", "Cost is not tracked: add price_in_per_mtok and price_out_per_mtok to codepilot.yml.", "muted"));
+    if (d.cost_usd === null) m.appendChild(el("p", "Cost is not tracked: set LANGSMITH_API_KEY (LangSmith prices every model call) or add price_in_per_mtok and price_out_per_mtok to codepilot.yml.", "muted"));
     m.appendChild(table(["Status", "Runs"], Object.entries(d.by_state).map(([k, v]) => [status(k), num(v)])));
   },
   async matrix(m) {
     const d = await api("matrix");
-    m.appendChild(table(["Run", "Issue", "Outcome", "Title", "Type", ...d.stages], d.rows.map(r => [
+    m.appendChild(table(["Run", "Issue", "Outcome", "Cost", "Title", "Type", ...d.stages], d.rows.map(r => [
       td(runLink(r.run_id)), r.repo.split("/").pop() + " " + r.issue,
       r.pr_url ? td(link(status(r.state), r.pr_url)) : tdTitle(status(r.state) + (r.reason ? " — " + short(r.reason, 50) : ""), r.reason || ""),
+      r.cost_usd === null || r.cost_usd === undefined ? "" : "$" + Number(r.cost_usd).toFixed(3),
       el("td", r.title, "title"), (r.type || "").replace(/_/g, " "),
       ...d.stages.map(s => { const c = el("td", r.marks[s] === "done" ? "✓" : r.marks[s] === "failed" ? "✗" : ""); if (r.marks[s]) c.className = r.marks[s]; return c; })])));
   },

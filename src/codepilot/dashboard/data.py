@@ -20,7 +20,18 @@ def _events(runs_dir: Path, run_id: str, limit: int | None = None) -> list[dict]
     return [json.loads(x) for x in (lines[-limit:] if limit else lines)]
 
 
-def overview(conn: sqlite3.Connection, cost_tracked: bool = False) -> dict:
+def langsmith_costs(client: Any, project: str, limit: int = 500) -> dict[str, float]:
+    """Cost per CodePilot+ run from LangSmith (it prices every model call, incl. prompt-cache discounts).
+    Root traces carry metadata.run_id (worker config); a continuation adds to the same run."""
+    out: dict[str, float] = {}
+    for r in client.list_runs(project_name=project, is_root=True, limit=limit):
+        rid = ((getattr(r, "extra", None) or {}).get("metadata") or {}).get("run_id")
+        if rid and getattr(r, "total_cost", None) is not None:
+            out[rid] = round(out.get(rid, 0.0) + float(r.total_cost), 6)
+    return out
+
+
+def overview(conn: sqlite3.Connection, cost_tracked: bool = False, trace_costs: dict | None = None) -> dict:
     by_state = {r["state"]: r["n"] for r in conn.execute("select state, count(*) n from runs group by state")}
     count = lambda a: conn.execute("select count(*) from events where action=?", (a,)).fetchone()[0]  # noqa: E731
     tok = conn.execute("select coalesce(sum(tokens_in),0) ti, coalesce(sum(tokens_out),0) tout, sum(cost_usd) c from runs").fetchone()
@@ -34,7 +45,8 @@ def overview(conn: sqlite3.Connection, cost_tracked: bool = False) -> dict:
             "commands_refused": count("command_refused"), "issues_blocked": count("issue_blocked"),
             "proposals_waiting": proposals,
             "tokens_in": tok["ti"], "tokens_out": tok["tout"],
-            "cost_usd": round(tok["c"] or 0, 2) if cost_tracked else None}      # None = no prices in codepilot.yml
+            "cost_usd": (round(sum(trace_costs.values()), 2) if trace_costs else round(tok["c"] or 0, 2) if cost_tracked else None),
+            "cost_source": "LangSmith" if trace_costs else ("codepilot.yml prices" if cost_tracked else None)}
 
 
 def _stage_marks(conn, runs_dir: Path, run: sqlite3.Row) -> dict[str, str]:
@@ -62,11 +74,12 @@ def _stage_marks(conn, runs_dir: Path, run: sqlite3.Row) -> dict[str, str]:
     return marks
 
 
-def matrix(conn, runs_dir: Path) -> dict:
+def matrix(conn, runs_dir: Path, trace_costs: dict | None = None) -> dict:
     rows = []
     for r in conn.execute("select * from runs order by created_at desc limit 200"):
         rows.append({"run_id": r["id"], "repo": r["repo"], "issue": r["issue_key"], "title": r["title"], "state": r["state"],
-                     "reason": r["reason"], "type": r["task_type"], "pr_url": r["pr_url"], "marks": _stage_marks(conn, runs_dir, r)})
+                     "reason": r["reason"], "type": r["task_type"], "pr_url": r["pr_url"], "marks": _stage_marks(conn, runs_dir, r),
+                     "cost_usd": (trace_costs or {}).get(r["id"])})
     return {"stages": STAGES, "rows": rows}
 
 

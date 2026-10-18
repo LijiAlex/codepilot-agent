@@ -24,3 +24,4 @@ github_app_id_env: CODEPILOT_GH_APP_ID
 github_app_key_path_env: CODEPILOT_GH_APP_KEY_PATH
 injection_checker: nemo          # issue screen: NeMo Guardrails input rails (brief); "bedrock" = AWS Bedrock guardrail
 guardrail_model: "anthropic:claude-haiku-5-5"
+reviewer_login: "codepilot-reviewer[bot]"   # your reviewer App slug + [bot]; the dashboard shows its reviews and gates Merge on them
