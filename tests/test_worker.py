@@ -346,3 +346,15 @@ def test_a_run_that_changes_nothing_says_why_in_the_agents_words(env):
     it = item(env); rid = claim(env, it)
     out = Worker(s).run(it, rid)
     assert out.state == "FAILED" and out.reason.startswith("no change made — I haven't changed anything, because the issue conflicts")
+
+
+def test_a_refused_command_after_verify_does_not_void_it(env):
+    # live 2026-10-18 (#4, #5): the guard refused `python -c …` after a passing verify, yet the run was marked untested
+    ta = [tool_call("write_file", {"file_path": "/sandbox/tests/test_empty.py", "content": EMPTY_TEST}, "t1"),
+          tool_call("run_tests", {"purpose": "verify"}, "t2"),
+          tool_call("execute", {"command": "python -c \"import tomllib\""}, "t3"),        # refused: inline python
+          AIMessage(content="2 passed")]
+    s = services(env, base_scripts(**{"test-agent": ta}))
+    it = item(env); rid = claim(env, it)
+    out = Worker(s).run(it, rid)
+    assert out.reason == "publish", out

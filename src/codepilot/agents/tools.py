@@ -100,6 +100,7 @@ class AttemptState:
     failures_this_run: int = 0
     last_report: TestReport | None = None
     verified: TestReport | None = None             # last purpose="verify" report; cleared by any later change (worker)
+    pending_changes: dict = field(default_factory=dict)   # tool_call_id -> tool name, for calls that may change files
     saw_no_tests: bool = False                     # pytest exit 5 seen: the repo had no tests (E6 flag)
 
     @property

@@ -59,6 +59,8 @@ Working state: {task_json}.
 - Then run run_tests(purpose="verify") with the relevant test ids{full_suite_note}.
 - You may only create or edit test files. Never delete, skip or weaken existing tests.
 - Run tests with run_tests, not the shell: only run_tests results count as verification.
+- Shell: one command per call, relative paths (`cd sandbox && …`); /sandbox paths, redirection, multi-line or inline
+  python (`python -c`) and pip are refused. Read files with read_file instead of printing them from Python.
 - If tests cannot be collected because the test setup itself is broken, say so: the coder will ask test-doctor.
 Reply with the parsed result (counts, failing ids, flaky ids) and one line per failure explaining it.
 {lessons}"""

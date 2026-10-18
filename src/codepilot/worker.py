@@ -193,7 +193,13 @@ class Worker:
         elif e.kind == "tool_result" and e.data.get("name") == "show_diff":
             wm.update(diff_path="/shared/proposed_diff.txt")
         elif e.kind == "tool_call" and _changes_files(e.data):
-            attempts.verified = None                               # a change after the last verify is untested
+            attempts.pending_changes[e.data.get("id")] = e.data.get("name")   # judged when its result shows it ran
+        elif e.kind == "tool_result" and e.data.get("tool_call_id") in attempts.pending_changes:
+            name = attempts.pending_changes.pop(e.data.get("tool_call_id"))
+            refused = (e.text or "").startswith("refused by CodePilot+ guard")
+            ran = not refused if name == "execute" else e.data.get("status") != "error"
+            if ran:
+                attempts.verified = None                           # a change after the last verify is untested
         elif e.kind == "tool_result" and e.data.get("name") == "run_tests" and attempts.last_report is not None:
             r = attempts.last_report
             wm.update(test_results={"outcome": r.outcome, "passed": r.passed, "failed": r.failed, "failing_ids": r.failing_ids},
