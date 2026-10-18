@@ -236,7 +236,7 @@ def test_cost_comes_from_langsmith_traces_matched_by_run_id(env):
     from codepilot.dashboard import data
     class FakeLS:
         def list_runs(self, **kw):
-            assert kw["project_name"] == "codepilot-plus" and kw["is_root"] is True
+            assert kw["project_name"] == "codepilot-plus" and kw["is_root"] is True and kw["limit"] <= 100   # LangSmith max
             return [NS(extra={"metadata": {"run_id": env.rid}}, total_cost=0.1234),
                     NS(extra={"metadata": {"run_id": env.rid}}, total_cost=0.0100),    # a continuation of the same run
                     NS(extra={"metadata": {}}, total_cost=9.0)]                       # not ours: ignored

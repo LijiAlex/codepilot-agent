@@ -20,7 +20,7 @@ def _events(runs_dir: Path, run_id: str, limit: int | None = None) -> list[dict]
     return [json.loads(x) for x in (lines[-limit:] if limit else lines)]
 
 
-def langsmith_costs(client: Any, project: str, limit: int = 500) -> dict[str, float]:
+def langsmith_costs(client: Any, project: str, limit: int = 100) -> dict[str, float]:   # 100 = LangSmith query maximum
     """Cost per CodePilot+ run from LangSmith (it prices every model call, incl. prompt-cache discounts).
     Root traces carry metadata.run_id (worker config); a continuation adds to the same run."""
     out: dict[str, float] = {}
