@@ -115,7 +115,7 @@ def test_workflow_security_properties():
     assert "secrets." not in tests_text and jobs["tests"]["steps"][0]["with"]["persist-credentials"] is False
     review_checkouts = [s for s in jobs["review"]["steps"] if s.get("uses", "").startswith("actions/checkout")]
     # the reviewer code is read from the PR's BASE commit (a PR cannot change the reviewer that judges it), only its folder
-    assert review_checkouts and all(s["with"]["ref"] == "${{ github.event.pull_request.base.sha }}"
+    assert review_checkouts and all(s["with"]["ref"] == "${{ github.event.pull_request.base.ref }}"
                                     and s["with"]["sparse-checkout"].strip() == ".github/codepilot-review"
                                     and s["with"]["persist-credentials"] is False and "repository" not in s["with"] for s in review_checkouts)
     run_steps = " ".join(s.get("run", "") for s in jobs["review"]["steps"])

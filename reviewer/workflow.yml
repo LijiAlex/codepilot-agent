@@ -49,8 +49,8 @@ jobs:
           permission-issues: write
           permission-contents: read
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:                                   # the reviewer as it is on the BASE branch: a PR cannot change its own judge
-          ref: ${{ github.event.pull_request.base.sha }}
+        with:                                   # the reviewer as it is on the base branch: a PR cannot change its own judge
+          ref: ${{ github.event.pull_request.base.ref }}   # the base BRANCH (main): never the PR head
           sparse-checkout: .github/codepilot-review
           path: cp
           persist-credentials: false

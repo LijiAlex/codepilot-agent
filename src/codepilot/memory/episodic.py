@@ -60,7 +60,8 @@ class EpisodicMemory:
 
     def recently_failed(self, repo: str, n_sessions: int = 3) -> set[str]:
         """Issues that failed in the last n sessions (brief: avoid retrying recently failed issues)."""
-        sessions = self.last_sessions(n_sessions)
+        # sessions that ran nothing (e.g. a TUI opened and closed) do not count: restarting must not make a retry happen sooner
+        sessions = [x for x in self.last_sessions(1000) if (x.get("summary") or "no runs") != "no runs"][:n_sessions]
         if not sessions:
             return set()
         since = min(s["started"] for s in sessions)

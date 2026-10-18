@@ -76,3 +76,11 @@ def test_scoreboard_rows_stay_on_one_line_for_multiline_reasons(tmp_path):
     rows = [l for l in md.splitlines() if "setup:" in l]
     assert rows and all(l.startswith("|") and l.rstrip().endswith("|") for l in rows) and "Obtaining" not in md.split("Checking")[0][-5:]
     assert "\\|" in md or "pipes" not in md                         # a literal | inside a reason cannot break the table
+
+
+def test_install_reviewer_dry_run_lists_files_and_sets_the_install_command():
+    m = load("install_reviewer")
+    files = m.files_for(install="pip install pytest")
+    assert set(files) == {".github/workflows/codepilot-review.yml", ".github/codepilot-review/review.py",
+                          ".github/codepilot-review/requirements.txt", ".github/codepilot-review/policy.yaml", ".github/codepilot-review.yaml"}
+    assert 'INSTALL: "pip install pytest"' in files[".github/workflows/codepilot-review.yml"]

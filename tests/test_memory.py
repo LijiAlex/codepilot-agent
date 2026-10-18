@@ -112,3 +112,13 @@ def test_infrastructure_failures_do_not_block_a_retry(tmp_path):
     em.record_run("o/r", "r2", "o/r#2", "FAILED", "sandbox_lost", "")
     em.record_run("o/r", "r3", "o/r#3", "FAILED", "tests", "")
     assert em.recently_failed("o/r") == {"o/r#3"}
+
+
+def test_empty_sessions_do_not_push_a_failure_out_of_the_window(tmp_path):
+    # live 2026-10-18: TUI restarts ("no runs") made #7 eligible again after one failure
+    em = EpisodicMemory(tmp_path / "episodic.db")
+    em.save_session("s1", "FAILED(tests): 1", {"counts": {"FAILED(tests)": 1}}); time.sleep(0.002)
+    em.record_run("o/r", "r1", "o/r#7", "FAILED", "tests", ""); time.sleep(0.002)
+    for s in ("s2", "s3", "s4"):
+        em.save_session(s, "no runs", {"counts": {}}); time.sleep(0.002)
+    assert em.recently_failed("o/r") == {"o/r#7"}
