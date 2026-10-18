@@ -176,5 +176,5 @@ def test_workflow_runs_on_new_commits_and_the_pending_label_only():
 def test_reviewer_model_uses_the_default_temperature():
     # live 2026-10-18: OpenAI 400 "Unsupported value: 'temperature'" for the reviewer model
     src = (ROOT / "reviewer" / "review.py").read_text()
-    call = src[src.index("ChatOpenAI("):].split(")", 1)[0]
-    assert "temperature" not in call
+    line = next(l for l in src.splitlines() if "ChatOpenAI(" in l)
+    assert "temperature" not in line
