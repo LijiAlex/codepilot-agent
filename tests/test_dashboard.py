@@ -218,3 +218,15 @@ def test_page_files_are_not_cached_so_updates_show(env):
     r = env.client.get("/static/app.js", headers={"host": H["host"]})
     assert r.status_code == 200 and r.headers.get("cache-control", "") in ("no-store", "no-cache")
     assert env.client.get("/", headers={"host": H["host"]}).headers.get("cache-control", "") in ("no-store", "no-cache")
+
+
+@pytest.mark.skipif(__import__("shutil").which("node") is None, reason="needs node")
+def test_friendly_summary_handles_nested_brackets_and_newlines():
+    import subprocess
+    js = (Path(__file__).parents[1] / "src" / "codepilot" / "dashboard" / "static" / "app.js").read_text()
+    grab = lambda name: re.search(r"(function " + name + r"\(.*?\n\})", js, re.S).group(1)
+    prog = "const STATUS = {FAILED: 'failed', PR_OPENED: 'PR opened', AWAITING_APPROVAL: 'waiting for approval'};\n" + \
+        grab("status") + "\n" + grab("friendlySummary") + "\n" + \
+        "console.log(friendlySummary('FAILED(setup: box command failed (1): cd …\\nObtaining file:///x\\n  Checking if build backen): 1 | PR_OPENED: 2'))"
+    out = subprocess.run(["node", "-e", prog], capture_output=True, text=True, check=True).stdout.strip()
+    assert out.startswith("failed (setup: box command failed (1): cd") and out.endswith("×1 | PR opened ×2") and "FAILED" not in out

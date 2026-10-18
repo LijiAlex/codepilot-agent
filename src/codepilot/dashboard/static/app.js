@@ -60,7 +60,9 @@ function textWithCode(text) {           // `code` spans as code, [run id] as a r
   return span;
 }
 function friendlySummary(text) {        // "FAILED(error: X): 1 | PR_OPENED: 2" -> "failed (error: X) ×1, PR opened ×2"
-  return String(text || "").replace(/\b([A-Z_]{4,})(\(([^)]*)\))?: (\d+)/g, (m, st, _p, why, n) => status(st) + (why ? " (" + why + ")" : "") + " ×" + n);
+  const flat = String(text || "").replace(/\s+/g, " ");               // stored reasons may span lines
+  return flat.replace(/\b([A-Z_]{4,})(\(((?:[^()]|\([^()]*\))*)\))?: (\d+)/g,    // one level of nested brackets, e.g. "failed (1)"
+    (m, st, _p, why, n) => status(st) + (why ? " (" + why.trim() + ")" : "") + " ×" + n);
 }
 function details(summary, body) { const d = el("details"), s = el("summary", summary); d.appendChild(s); d.appendChild(el("pre", body)); return d; }
 function diffBlock(diff) {
