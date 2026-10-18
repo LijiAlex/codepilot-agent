@@ -193,3 +193,22 @@ def test_dashboard_token_survives_a_restart_and_is_private(tmp_path, monkeypatch
 def test_page_explains_an_out_of_date_link():
     js = (Path(__file__).parents[1] / "src" / "codepilot" / "dashboard" / "static" / "app.js").read_text()
     assert "access link is out of date" in js
+
+
+def test_run_detail_includes_the_logged_error_and_safety_names_missed_attacks(env, tmp_path):
+    env.client.app  # noqa: B018
+    from codepilot.audit import AuditLog
+    AuditLog(env.conn).log("worker", "run_error", run_id=env.rid, result="error", detail={"type": "SandboxSetupError", "output_tail": "ERROR: requires a different Python"})
+    run = env.client.get(f"/api/runs/{env.rid}", headers=H).json()
+    assert any("requires a different Python" in e for e in run["errors"])
+    res = tmp_path / "results"; res.mkdir(exist_ok=True)
+    (res / "guardrail.json").write_text(json.dumps({"detected": 1, "malicious": 2, "false_alarms": 0, "benign": 1, "failed_closed": 0,
+        "p50_ms": 5, "rows": [{"id": "m1", "label": "malicious", "blocked": True}, {"id": "m2", "label": "malicious", "blocked": False}]}))
+    from codepilot.dashboard.data import safety
+    g = safety(env.conn, res)["guardrail_measurement"]
+    assert g["missed"] == ["m2"] and g["measured_at"]
+
+
+def test_page_routes_by_url_and_shows_local_times():
+    js = (Path(__file__).parents[1] / "src" / "codepilot" / "dashboard" / "static" / "app.js").read_text()
+    assert 'addEventListener("hashchange", route)' in js and "local time" in js and "friendlySummary" in js

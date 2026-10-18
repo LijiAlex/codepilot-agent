@@ -377,6 +377,8 @@ class Worker:
         except TriageError as e:
             return self._finish(rec, run_id, item, RunState.FAILED, f"triage: {redact(str(e))[:200]}")
         except SandboxSetupError as e:
+            s.audit.log("worker", "run_error", run_id=run_id, result="error",
+                        detail={"type": "SandboxSetupError", "output_tail": redact(str(e))[-2000:]})   # the cause is at the end
             return self._finish(rec, run_id, item, RunState.FAILED, setup_reason(e))
         except (ModelCallLimitExceededError, ToolCallLimitExceededError):
             return self._finish(rec, run_id, item, RunState.FAILED, "step_limit")

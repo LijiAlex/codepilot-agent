@@ -32,4 +32,7 @@ details { margin: 8px 0; }
 details > summary { cursor: pointer; font-weight: 600; }
 code { background: color-mix(in srgb, var(--accent) 12%, transparent); padding: 0 3px; border-radius: 3px; }
 /* narrow screens: keep the first column (run / issue / PR) visible while the table scrolls */
-.table-wrap th:first-child, .table-wrap td:first-child { position: sticky; left: 0; background: var(--card); z-index: 1; }
+.table-wrap { position: relative; }
+.table-wrap th:first-child, .table-wrap td:first-child { position: sticky; left: 0; z-index: 1; background: var(--card); background-clip: padding-box; box-shadow: 2px 0 0 var(--line); }
+.table-wrap th:first-child { background: var(--bg); }
+td.title { min-width: 220px; }

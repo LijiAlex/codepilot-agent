@@ -25,6 +25,7 @@ function status(s) { return STATUS[s] || String(s || "").toLowerCase().replace(/
 function short(text, n = 70) { const first = String(text || "").split("\n").map(x => x.trim()).filter(Boolean); const t = first.join(" "); return t.length > n ? t.slice(0, n - 1) + "…" : t; }
 function when(v) {                      // session times are nanosecond timestamps; other times are already text
   if (typeof v === "number") { const ms = v > 1e15 ? v / 1e6 : v > 1e12 ? v : v * 1000; return new Date(ms).toLocaleString(); }
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(v || "")) return new Date(v.replace(" ", "T") + "Z").toLocaleString();   // stored in UTC
   return v || "";
 }
 function pct(x) { return x === null || x === undefined || x === "" ? "" : Math.round(Number(x) * 100) + "%"; }
@@ -47,14 +48,19 @@ function table(headers, rows) {
 function td(node) { const c = el("td"); c.appendChild(node); return c; }
 function tdTitle(text, full) { const c = el("td", text); if (full && full !== text) c.title = full; return c; }
 function link(text, href) { const a = el("a", text); if (/^https:\/\/github\.com\//.test(href || "")) { a.href = href; a.rel = "noopener noreferrer"; a.target = "_blank"; } return a; }
-function runLink(id) { if (!id) return el("span", ""); const a = el("a", id); a.href = "#run=" + encodeURIComponent(id); a.addEventListener("click", ev => { ev.preventDefault(); showRun(id); }); return a; }
+function runLink(id) { if (!id) return el("span", ""); const a = el("a", id); a.href = "#run=" + encodeURIComponent(id); return a; }   // routed by hashchange
 function textWithLinks(text) {           // GitHub URLs become links; everything else stays plain text
   const span = el("span"); String(text || "").split(/(https:\/\/github\.com\/\S+)/).forEach(part => span.appendChild(/^https:\/\/github\.com\//.test(part) ? link(part, part) : document.createTextNode(part)));
   return span;
 }
-function textWithCode(text) {           // `code` spans shown as code, built with textContent only
-  const span = el("span"); String(text || "").split(/(`[^`]+`)/).forEach(part => span.appendChild(/^`[^`]+`$/.test(part) ? el("code", part.slice(1, -1)) : document.createTextNode(part)));
+function textWithCode(text) {           // `code` spans as code, [run id] as a run link; built with textContent only
+  const span = el("span");
+  String(text || "").split(/(`[^`]+`|\[[0-9a-f]{12}\])/).forEach(part => span.appendChild(
+    /^`[^`]+`$/.test(part) ? el("code", part.slice(1, -1)) : /^\[[0-9a-f]{12}\]$/.test(part) ? runLink(part.slice(1, -1)) : document.createTextNode(part)));
   return span;
+}
+function friendlySummary(text) {        // "FAILED(error: X): 1 | PR_OPENED: 2" -> "failed (error: X) ×1, PR opened ×2"
+  return String(text || "").replace(/\b([A-Z_]{4,})(\(([^)]*)\))?: (\d+)/g, (m, st, _p, why, n) => status(st) + (why ? " (" + why + ")" : "") + " ×" + n);
 }
 function details(summary, body) { const d = el("details"), s = el("summary", summary); d.appendChild(s); d.appendChild(el("pre", body)); return d; }
 function diffBlock(diff) {
@@ -80,7 +86,7 @@ const render = {
     m.appendChild(table(["Run", "Issue", "Outcome", "Title", "Type", ...d.stages], d.rows.map(r => [
       td(runLink(r.run_id)), r.repo.split("/").pop() + " " + r.issue,
       r.pr_url ? td(link(status(r.state), r.pr_url)) : tdTitle(status(r.state) + (r.reason ? " — " + short(r.reason, 50) : ""), r.reason || ""),
-      r.title, (r.type || "").replace(/_/g, " "),
+      el("td", r.title, "title"), (r.type || "").replace(/_/g, " "),
       ...d.stages.map(s => { const c = el("td", r.marks[s] === "done" ? "✓" : r.marks[s] === "failed" ? "✗" : ""); if (r.marks[s]) c.className = r.marks[s]; return c; })])));
   },
   async prs(m) {
@@ -98,7 +104,8 @@ const render = {
         const merge = mk("Merge", "merge", "", "Squash-merge " + repo + "#" + p.number + " at " + p.head_sha.slice(0, 7) + " into the default branch?");
         if (why) { merge.disabled = true; merge.title = why; }
         actions.appendChild(merge);
-        actions.appendChild(mk("Close", "close", "danger", "Close " + repo + "#" + p.number + " without merging? (It can be reopened on GitHub.)"));
+        const close = mk("Close", "close", "danger", "Close " + repo + "#" + p.number + " without merging? (It can be reopened on GitHub.)");
+        close.title = "Close without merging (asks first)"; actions.appendChild(close);
         if (why) actions.appendChild(el("div", "Merge: " + why, "muted small"));
         const rev = el("td"); if (p.review) { rev.appendChild(el("pre", p.review.body)); if (!p.review.current) rev.appendChild(el("p", "review is for an older commit", "muted")); } else rev.appendChild(el("span", "not reviewed yet", "muted"));
         return [td(link("#" + p.number + " " + p.title, p.url)), actions, rev, p.labels.join(", "), p.author];
@@ -107,12 +114,15 @@ const render = {
   },
   async safety(m) {
     const d = await api("safety");
-    const sec = (title, rows) => { m.appendChild(el("h2", title)); m.appendChild(table(["When", "Run", "Who", "What", "Result"], rows.map(r => [r.ts, td(runLink(r.run_id)), r.actor, r.target || "", r.result]))); };
+    const sec = (title, rows) => { m.appendChild(el("h2", title)); m.appendChild(table(["When", "Run", "Who", "What", "Result"], rows.map(r => [when(r.ts), td(runLink(r.run_id)), r.actor, r.target || "", r.result]))); };
     sec("Commands refused by the guard", d.commands_refused); sec("Unexpected commands sent to a person", d.commands_needing_decision);
     sec("Tools refused (not on the agent's list)", d.tools_refused); sec("Issues blocked by the injection screen", d.issues_blocked);
     if (d.guardrail_measurement) { const g = d.guardrail_measurement; m.appendChild(el("h2", "Injection screen, measured on labelled issues"));
       m.appendChild(table(["Measure", "Result"], [["Attacks blocked", g.detected + " of " + g.malicious], ["Harmless issues wrongly blocked", g.false_alarms + " of " + g.benign],
-        ["Screen did not answer (issue held back)", num(g.failed_closed)], ["Typical time per issue (median)", num(g.p50_ms) + " ms"]])); }
+        ["Screen did not answer (issue held back)", num(g.failed_closed)], ["Typical time per issue (median)", num(Math.round(g.p50_ms)) + " ms"],
+        ["Attacks not blocked by the screen", (g.missed || []).join(", ") || "none"], ["Harmless issues blocked", (g.false_alarm_ids || []).join(", ") || "none"],
+        ["Measured", when(g.measured_at)]]));
+      m.appendChild(el("p", "Labelled issues are in evals/issues.yaml. An attack can be removed by the sanitiser before the screen sees it.", "muted")); }
   },
   async context(m) {
     const d = await api("context"), budget = d.budget || 4000;
@@ -123,22 +133,24 @@ const render = {
   },
   async memory(m) {
     const d = await api("memory");
-    for (const [repo, lessons] of Object.entries(d.lessons)) { m.appendChild(el("h2", "Lessons — " + repo));
-      m.appendChild(table(["Type", "Source", "Lesson"], lessons.map(l => [(l.task_type || "").replace(/_/g, " "), l.source, l.text]))); }
+    m.appendChild(el("h2", "Lessons"));
+    m.appendChild(el("p", "Written when a PR is merged (and from failures or rejections); recalled for later runs on the same repository.", "muted"));
+    const all = Object.entries(d.lessons).flatMap(([repo, ls]) => ls.map(l => [repo.split("/").pop(), (l.task_type || "").replace(/_/g, " "), l.source, l.text]));
+    m.appendChild(table(["Repo", "Type", "Source", "Lesson"], all));
     m.appendChild(el("h2", "Recent sessions"));
     m.appendChild(el("p", "Each summary is a snapshot taken when that session ended; a run's current status is on the Runs page.", "muted"));
     const sessions = d.sessions.filter(s => s.summary && s.summary !== "no runs");
-    m.appendChild(table(["Started", "Summary (at session end)"], sessions.map(s => [when(s.started), tdTitle(short(s.summary, 120), s.summary)])));
+    m.appendChild(table(["Started", "Summary (at session end)"], sessions.map(s => [when(s.started), tdTitle(short(friendlySummary(s.summary), 120), friendlySummary(s.summary))])));
   },
   async skills(m) {
     const d = await api("skills");
     m.appendChild(table(["Skill", "Task type", "Workflow", "Must not"], d.brief_skills.map(s => [s.display_name, s.task_type.replace(/_/g, " "), s.workflow_steps.join(" → "), s.forbidden_actions.join("; ")])));
     for (const [repo, versions] of Object.entries(d.repo_skills || {})) { m.appendChild(el("h2", "Repo skill — " + repo));
-      m.appendChild(table(["Version", "When", "Change"], versions.map(v => [v.version, v.created_at, td(textWithCode(v.change))]))); }
+      m.appendChild(table(["Version", "When", "Change"], versions.map(v => [v.version, when(v.created_at), td(textWithCode(v.change))]))); }
   },
   async audit(m) {
     const d = await api("audit");
-    m.appendChild(table(["#", "When", "Run", "Who", "Action", "Target", "Result"], d.events.map(e => [e.id, e.ts, td(runLink(e.run_id)),
+    m.appendChild(table(["Run", "#", "When", "Who", "Action", "Target", "Result"], d.events.map(e => [td(runLink(e.run_id)), e.id, when(e.ts),
       e.actor === "human" ? "human (TUI)" : e.actor, e.action.replace(/_/g, " "), td(textWithLinks(e.target || "")), e.result])));
   },
   async improvements(m) {
@@ -151,6 +163,7 @@ const render = {
         try { await api("improvements/" + p.id + "/" + dec, { confirm: true }); show("improvements"); } catch (e) { alert(e.message); } }); c.appendChild(b); });
       return [p.repo, td(textWithCode(p.change)), td(textWithCode(p.evidence)), pct(p.confidence), c]; })));
     m.appendChild(el("h2", "How runs went per repo-skill version"));
+    m.appendChild(el("p", "Failed commands per run: shell commands that ran and exited with an error (commands the guard refused are listed on Safety, not here). Tests passed on first try: share of runs whose first verification test run passed — a run can still fail later for another reason.", "muted"));
     m.appendChild(table(["Repo", "Version", "Runs", "Failed commands per run", "Tool calls per run", "Tests passed on first try"],
       d.trend.map(t => [t.repo, t.version, num(t.runs), t.failed_commands, t.tool_calls, t.first_try_pass === null ? "—" : pct(t.first_try_pass)])));
   },
@@ -163,10 +176,11 @@ async function showRun(id) {
   setActive(""); const m = document.getElementById("main"); loading(m);
   try {
     const d = await api("runs/" + encodeURIComponent(id)); clear(m);
-    const back = el("a", "← Back to runs", "back"); back.href = "#"; back.addEventListener("click", ev => { ev.preventDefault(); show("matrix"); }); m.appendChild(back);
+    const back = el("a", "← Back to runs", "back"); back.href = "#matrix"; m.appendChild(back);
     m.appendChild(el("h2", d.run.repo + " " + d.run.issue_key + " — " + d.run.title));
     m.appendChild(el("p", "Now: " + status(d.run.state) + " · " + (d.run.task_type || "").replace(/_/g, " ") + " · complexity " + (d.run.complexity ?? "") + "/10"));
-    if (d.run.reason) m.appendChild(details("Why it ended this way", d.run.reason));
+    const why = [d.run.reason || ""].concat((d.errors || []).map(x => "Full error (end of output):\n" + x)).filter(Boolean).join("\n\n");
+    if (why) m.appendChild(details("Why it ended this way", why));
     if (d.run.pr_url) { const p = el("p"); p.appendChild(link("Pull request: " + d.run.pr_url, d.run.pr_url)); m.appendChild(p); }
     if (d.context) m.appendChild(el("p", `Context: repo map ${num(d.context.map_tokens)} tokens, ${d.context.lessons} lesson(s), ${(d.context.skill || "").replace(/_/g, " ")}`, "muted"));
     d.handoffs.forEach(h => { m.appendChild(el("h3", h.entry_point.replace(/_/g, " ") + " — " + h.status)); if (h.payload.diff) m.appendChild(diffBlock(h.payload.diff)); });
@@ -178,17 +192,27 @@ async function showRun(id) {
 }
 
 async function show(page) {
+  if (location.hash !== "#" + page) { location.hash = page; return; }          // hashchange renders it (Back button works)
   setActive(page);
-  const m = document.getElementById("main"); loading(m);
+  const m = document.getElementById("main"); clear(m);
   const info = PAGES.find(p => p[0] === page);
+  m.appendChild(el("p", info[2] + " Times are in your local time.", "page-intro"));
+  const wait = el("p", "Loading…", "muted loading"); m.appendChild(wait);
   const holder = el("div");
-  try { await render[page](holder); clear(m); m.appendChild(el("p", info[2], "page-intro")); m.appendChild(holder); }
-  catch (e) { clear(m); m.appendChild(el("p", "Could not load: " + e.message + (token ? "" : " — open the link printed by `codepilot dashboard`."))); }
+  try { await render[page](holder); wait.remove(); m.appendChild(holder); }
+  catch (e) { wait.remove(); m.appendChild(el("p", "Could not load: " + e.message)); }
+}
+
+function route() {
+  const h = new URLSearchParams(location.hash.slice(1));
+  if (h.get("run")) return showRun(h.get("run"));
+  const page = location.hash.slice(1);
+  return show(PAGES.some(p => p[0] === page) ? page : "overview");
 }
 
 document.addEventListener("DOMContentLoaded", () => {
   const nav = document.getElementById("nav");
-  PAGES.forEach(([p, label]) => { const b = el("button", label); b.dataset.page = p; b.addEventListener("click", () => show(p)); nav.appendChild(b); });
-  const run = new URLSearchParams(location.hash.slice(1)).get("run");
-  run ? showRun(run) : show("overview");
+  PAGES.forEach(([p, label]) => { const b = el("button", label); b.dataset.page = p; b.addEventListener("click", () => { location.hash = p; }); nav.appendChild(b); });
+  window.addEventListener("hashchange", route);
+  route();
 });

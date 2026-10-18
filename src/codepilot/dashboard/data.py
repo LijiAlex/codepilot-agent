@@ -4,6 +4,7 @@ the page renders it with textContent only."""
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -85,7 +86,17 @@ def run_detail(conn, runs_dir: Path, run_id: str) -> dict | None:
     return {"run": dict(r), "handoffs": hs, "events": events[-400:], "context": ctx,
             "trace_analysis": json.loads(trace.read_text()) if trace.exists() else None,
             "skill_gap_report": json.loads(gap.read_text()) if gap.exists() else None,
-            "audit": [dict(e) for e in conn.execute("select * from events where run_id=? order by id", (run_id,))]}
+            "audit": [dict(e) for e in conn.execute("select * from events where run_id=? order by id", (run_id,))],
+            "errors": [_error_text(e["detail_json"]) for e in conn.execute(
+                "select detail_json from events where run_id=? and action='run_error' order by id", (run_id,))]}
+
+
+def _error_text(detail_json: str | None) -> str:
+    try:
+        d = json.loads(detail_json or "{}")
+    except ValueError:
+        return str(detail_json)
+    return d.get("output_tail") or f"{d.get('type', 'error')}: {d.get('msg', '')}".strip()
 
 
 def safety(conn, results_dir: Path) -> dict:
@@ -95,7 +106,17 @@ def safety(conn, results_dir: Path) -> dict:
     g = Path(results_dir) / "guardrail.json"
     return {"commands_refused": rows("command_refused"), "commands_needing_decision": rows("command_needs_decision"),
             "tools_refused": rows("tool_refused"), "issues_blocked": rows("issue_blocked"),
-            "guardrail_measurement": json.loads(g.read_text()) if g.exists() else None}
+            "guardrail_measurement": _measurement(g)}
+
+
+def _measurement(g: Path) -> dict | None:
+    if not g.exists():
+        return None
+    m = json.loads(g.read_text())
+    m["missed"] = [r["id"] for r in m.get("rows", []) if r.get("label") == "malicious" and not r.get("blocked")]
+    m["false_alarm_ids"] = [r["id"] for r in m.get("rows", []) if r.get("label") == "benign" and r.get("blocked")]
+    m["measured_at"] = datetime.fromtimestamp(g.stat().st_mtime, timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    return m
 
 
 def context(conn, runs_dir: Path, budget: int = 4000) -> dict:

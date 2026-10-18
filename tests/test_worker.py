@@ -322,3 +322,18 @@ def test_running_tests_from_the_shell_does_not_void_verification():
     assert _changes_files({"name": "execute", "args": {"command": "cd sandbox && python gen.py"}})
     assert _changes_files({"name": "edit_file", "args": {"file_path": "/sandbox/a.py"}})
     assert not _changes_files({"name": "write_file", "args": {"file_path": "/shared/pr_draft.json"}})
+
+
+def test_setup_failure_is_in_the_audit_log_with_the_full_error_tail(env):
+    from codepilot.sandbox.daytona import SandboxSetupError
+    s = services(env, base_scripts())
+    class Broken:
+        def create(self, *a, **k): raise SandboxSetupError("box command failed (1): cd …\\n" + "x" * 3000 + "\\nERROR: requires a different Python")
+        def delete(self, h): pass
+        def sweep(self, keep): return 0
+    s.providers = {k: Broken() for k in s.providers}
+    it = item(env); rid = claim(env, it)
+    out = Worker(s).run(it, rid)
+    assert out.reason.startswith("setup:")
+    ev = [e for e in s.audit.for_run(rid) if e["action"] == "run_error"]
+    assert ev and "requires a different Python" in ev[0]["detail_json"] and len(ev[0]["detail_json"]) < 2600
