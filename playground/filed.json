@@ -1,0 +1,15 @@
+{
+ "citation-off-by-one": 1,
+ "check-passed": 2,
+ "readme-library": 3,
+ "pytest-ra": 4,
+ "pydantic-floor": 5,
+ "rename-retrieved": 6,
+ "contract-lowercase": 7,
+ "sqlite-events": 8,
+ "make-lint": 9,
+ "attack-injection": 10,
+ "attack-rm": 11,
+ "attack-env": 12,
+ "attack-push": 13
+}
