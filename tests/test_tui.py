@@ -4,7 +4,7 @@ from textual.widgets import DataTable, Input, Label, ListView, RichLog, Static
 
 from codepilot.events import RunEvent
 from codepilot.tui.app import CodePilotApp
-from codepilot.tui.screens import InspectScreen, LogScreen, NewTaskScreen, ReasonScreen
+from codepilot.tui.screens import ConfirmScreen, InspectScreen, LogScreen, NewTaskScreen, ReasonScreen
 
 
 class FakeEngine:
@@ -60,7 +60,7 @@ async def test_approve_reject_inspect_keys():
     a, eng = app()
     async with a.run_test(size=(140, 40)) as pilot:
         await pilot.pause()
-        await pilot.press("a")
+        await pilot.press("a", "y")                    # approve asks first; y confirms
         assert ("decide", "h1", "approve", "") in eng.calls
         await pilot.press("v")
         assert isinstance(a.screen, InspectScreen)
@@ -106,3 +106,50 @@ async def test_markup_in_untrusted_text_is_shown_literally():
         await pilot.pause()
         table = a.query_one("#issues")
         assert evil[:40] in str(table.get_row_at(0)[1])
+
+
+
+def two_pending(eng):
+    eng.state["pending"] = [{"id": "h1", "repo": "o/plugin", "issue_key": "task:ab12", "entry_point": "publish", "flags": []},
+                            {"id": "h2", "repo": "o/playground", "issue_key": "#1", "entry_point": "publish", "flags": []}]
+
+
+@pytest.mark.anyio
+async def test_approve_names_the_item_and_does_nothing_until_confirmed():
+    a, eng = app(); two_pending(eng)
+    async with a.run_test(size=(140, 40)) as pilot:
+        await pilot.pause()
+        a.query_one("#approvals", ListView).index = 1
+        await pilot.pause()
+        await pilot.press("a")
+        assert isinstance(a.screen, ConfirmScreen)
+        text = str(a.screen.query_one("#confirm-text", Static).render())
+        assert "o/playground" in text and "#1" in text and "Open PR to main" in text
+        await pilot.press("n")
+        assert not [c for c in eng.calls if c[0] == "decide"]          # cancelled: nothing decided
+        await pilot.press("a", "y")
+        assert ("decide", "h2", "approve", "") in eng.calls and ("decide", "h1", "approve", "") not in eng.calls
+
+
+@pytest.mark.anyio
+async def test_selected_item_is_spelled_out_and_approval_panel_takes_focus():
+    a, eng = app(); two_pending(eng)
+    async with a.run_test(size=(140, 40)) as pilot:
+        await pilot.pause()
+        lv = a.query_one("#approvals", ListView)
+        assert a.focused is lv and lv.index == 0                        # pending items: focus lands where a/r/v act
+        assert "o/plugin task:ab12" in str(a.query_one("#approval-hint", Static).render())
+        lv.index = 1; await pilot.pause()
+        assert "o/playground #1" in str(a.query_one("#approval-hint", Static).render())
+
+
+@pytest.mark.anyio
+async def test_reject_screen_names_the_item():
+    a, eng = app(); two_pending(eng)
+    async with a.run_test(size=(140, 40)) as pilot:
+        await pilot.pause()
+        a.query_one("#approvals", ListView).index = 1; await pilot.pause()
+        await pilot.press("r")
+        assert isinstance(a.screen, ReasonScreen) and "o/playground #1" in str(a.screen.query_one(Label).render())
+        await pilot.press("escape")
+        assert not [c for c in eng.calls if c[0] == "decide"]

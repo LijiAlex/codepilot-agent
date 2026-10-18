@@ -2,6 +2,8 @@
 """Pop-up screens: inspect (read-only), new free-form task, reject reason, full-screen logs."""
 from __future__ import annotations
 
+from rich.text import Text
+
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical, VerticalScroll
@@ -52,12 +54,36 @@ class NewTaskScreen(ModalScreen[dict | None]):
         self.dismiss(None)
 
 
+class ConfirmScreen(ModalScreen[bool]):
+    """Spell out exactly what is about to be approved; nothing happens until y (or Enter)."""
+    BINDINGS = [Binding("y,enter", "yes", "Yes"), Binding("n,escape", "no", "No")]
+
+    def __init__(self, text: str):
+        super().__init__()
+        self.text = text
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="confirm"):
+            yield Static(self.text, id="confirm-text", markup=False)
+            yield Static("[y] confirm    [n] cancel", id="confirm-keys", markup=False)
+
+    def action_yes(self) -> None:
+        self.dismiss(True)
+
+    def action_no(self) -> None:
+        self.dismiss(False)
+
+
 class ReasonScreen(ModalScreen[str | None]):
     BINDINGS = [Binding("escape", "cancel", "Cancel")]
 
+    def __init__(self, item: str = ""):
+        super().__init__()
+        self.item = item
+
     def compose(self) -> ComposeResult:
         with Vertical(id="reason"):
-            yield Label("Reject — reason (optional, becomes a lesson). Enter to confirm, Esc to cancel.")
+            yield Label(Text(f"Reject {self.item} — reason (optional, becomes a lesson). Enter to confirm, Esc to cancel."))
             yield Input(id="reason-input")
 
     def on_input_submitted(self, event: Input.Submitted) -> None:

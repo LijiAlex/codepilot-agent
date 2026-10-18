@@ -15,7 +15,7 @@ from textual.containers import Vertical
 from textual.widgets import DataTable, Footer, Label, ListItem, ListView, RichLog, Static
 
 from codepilot.engine import UiCallbacks
-from codepilot.tui.screens import InspectScreen, LogScreen, NewTaskScreen, ReasonScreen
+from codepilot.tui.screens import ConfirmScreen, InspectScreen, LogScreen, NewTaskScreen, ReasonScreen
 
 STATE_ICON = {"DONE": "✓", "FAILED": "✗", "SKIPPED": "–", "CLOSED": "■", "AWAITING_APPROVAL": "⚠", "PR_OPENED": "⇪"}
 ENTRY_LABEL = {"publish": "Open PR to main (PR-to-main / git push gate)", "publish_failed": "Publishing failed — retry the PR",
@@ -29,9 +29,18 @@ class CodePilotApp(App):
     TITLE = "CodePilot+"
     CSS = """
     Screen { layout: grid; grid-size: 2 2; grid-columns: 1fr 2fr; grid-rows: 1fr 1fr; }
-    .panel { border: round $accent; padding: 0 1; }
-    .panel > Label { text-style: bold; }
+    .panel { border: round $panel-lighten-2; padding: 0 1; }
+    .panel > Label { text-style: bold; color: $text-muted; }
+    .panel:focus-within { border: heavy $warning; }              /* the panel the arrow keys move in */
+    .panel:focus-within > Label { color: $warning; }
+    #approvals > ListItem { padding: 0 1; }
+    #approvals > ListItem.-highlight { background: $warning 35%; text-style: bold; }
+    #approvals:focus > ListItem.-highlight { background: $warning; color: $background; text-style: bold; }
+    #approval-hint { color: $warning; text-style: bold; height: auto; }
     #inspect, #new-task, #reason { width: 90%; height: 90%; border: thick $accent; background: $surface; padding: 1; }
+    ConfirmScreen { align: center middle; }
+    #confirm { width: 90; max-width: 95%; height: auto; border: thick $warning; background: $surface; padding: 1 2; }
+    #confirm-keys { margin-top: 1; color: $text-muted; }
     """
     BINDINGS = [Binding("i", "new_task", "New task"), Binding("s", "skip", "Skip issue"), Binding("q", "quit", "Quit"),
                 Binding("l", "logs", "Logs"), Binding("a", "approve", "Approve"), Binding("r", "reject", "Reject"),
@@ -71,7 +80,7 @@ class CodePilotApp(App):
         with Vertical(classes="panel", id="approval-panel"):
             yield Label("Human Approval")
             yield ListView(id="approvals")
-            yield Static("[a] approve  [r] reject  [v] inspect", id="approval-hint")
+            yield Static("nothing waiting", id="approval-hint", markup=False)
         yield Footer()
 
     def on_mount(self) -> None:
@@ -138,6 +147,8 @@ class CodePilotApp(App):
             table.add_row(Text(f"#{num}"), "", Text(f"skipped: {why}"))
             self.issue_rows.append({"repo": repo, "issue_key": f"#{num}"})
         approvals = self.query_one("#approvals", ListView)
+        keep = self._selected_id()
+        had_pending = bool(self.pending)
         approvals.clear()
         self.pending = v["pending"]
         for h in self.pending:
@@ -145,6 +156,15 @@ class CodePilotApp(App):
             if "more_than_5_files" in h.get("flags", []):          # brief gate: commit touching more than 5 files (E18)
                 label += f" — commit touches {h.get('file_count', '?')} files (>5-file gate)"
             approvals.append(ListItem(Label(Text(label))))
+        ids = [h["id"] for h in self.pending]
+        idx = ids.index(keep) if keep in ids else (0 if ids else None)
+
+        def restore() -> None:                                  # after the new rows are mounted
+            approvals.index = idx
+            if self.pending and not had_pending and self.screen is self.screen_stack[0]:
+                approvals.focus()                               # items arrived: focus where a / r / v act
+            self._update_hint()
+        self.call_after_refresh(restore)
         self._current = v["current"]
         self._render_task()
 
@@ -161,18 +181,47 @@ class CodePilotApp(App):
                         f"Skill: {cur.get('skill') or '-'}\nTodo:\n{todo_lines or '  (not planned yet)'}"))
 
     # ---- actions -----------------------------------------------------------
-    def _selected_handoff(self) -> dict | None:
+    def _describe(self, h: dict) -> str:
+        return f"{h['repo']} {h['issue_key']} — {ENTRY_LABEL.get(h['entry_point'], h['entry_point'])}"
+
+    def _selected_id(self) -> str | None:
+        h = self._selected_handoff(quiet=True)
+        return h["id"] if h else None
+
+    def _selected_handoff(self, quiet: bool = False) -> dict | None:
         lv = self.query_one("#approvals", ListView)
         if not self.pending:
-            self.notify("Nothing is waiting for approval")
+            if not quiet:
+                self.notify("Nothing is waiting for approval")
             return None
-        return self.pending[lv.index or 0]
+        if lv.index is None or not 0 <= lv.index < len(self.pending):
+            if not quiet:
+                self.notify("Select an item in Human Approval first (Tab to the panel, then ↑/↓ or click)")
+            return None
+        return self.pending[lv.index]
+
+    def _update_hint(self) -> None:
+        h = self._selected_handoff(quiet=True)
+        text = (f"Selected: {self._describe(h)}\n[a] approve  [r] reject  [v] inspect" if h else
+                ("Select an item (↑/↓ or click)" if self.pending else "nothing waiting"))
+        self.query_one("#approval-hint", Static).update(Text(text))
+
+    def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
+        if event.list_view.id == "approvals":
+            self._update_hint()
 
     def action_approve(self) -> None:
         h = self._selected_handoff()
-        if h:
-            self.engine.decide(h["id"], "approve", self.user)
-            self.notify(f"approved {h['issue_key']}")
+        if not h:
+            return
+
+        def done(ok: bool | None) -> None:
+            if ok:
+                self.engine.decide(h["id"], "approve", self.user)
+                self.notify(f"approved {h['repo']} {h['issue_key']}")
+        flags = f"\nFlags: {', '.join(h['flags'])}" if h.get("flags") else ""
+        self.push_screen(ConfirmScreen(f"Approve this item?\n\n{self._describe(h)}{flags}\n\n"
+                                       "Approving lets CodePilot+ act on GitHub for this item."), done)
 
     def action_reject(self) -> None:
         h = self._selected_handoff()
@@ -180,8 +229,8 @@ class CodePilotApp(App):
             def done(reason: str | None) -> None:
                 if reason is not None:
                     self.engine.decide(h["id"], "reject", self.user, reason)
-                    self.notify(f"rejected {h['issue_key']}")
-            self.push_screen(ReasonScreen(), done)
+                    self.notify(f"rejected {h['repo']} {h['issue_key']}")
+            self.push_screen(ReasonScreen(self._describe(h)), done)
 
     def action_inspect(self) -> None:
         h = self._selected_handoff()
