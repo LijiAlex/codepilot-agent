@@ -36,9 +36,12 @@ class NewTaskScreen(ModalScreen[dict | None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="new-task"):
-            yield Label("New task (not tied to a GitHub issue)")
+            yield Static("New task (not tied to a GitHub issue) — Esc to cancel", markup=False)
+            yield Label("Repository")
             yield Select([(r, r) for r in self.repos], value=self.repos[0], id="repo", allow_blank=False)
-            yield Input(placeholder="Title, e.g. Add a --version flag", id="title")
+            yield Label("Title")
+            yield Input(placeholder="e.g. Add a --version flag", id="title")
+            yield Label("What should change (details, expected behaviour)")
             yield TextArea(id="body")
             yield Button("Start", id="start", variant="primary")
 

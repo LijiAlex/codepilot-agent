@@ -170,3 +170,25 @@ async def test_issues_panel_shows_one_row_per_issue_with_status_first():
         assert [r[0] for r in rows] == ["playground #1", "plugin task:ab12", "playground #10"]
         assert "PR opened" in rows[0][1] and "failed" in rows[1][1] and "skipped" in rows[2][1]
         assert rows[0][2].startswith("Citation")
+
+
+@pytest.mark.anyio
+async def test_full_screen_logs_stack_filter_above_the_log():
+    a, eng = app()
+    async with a.run_test(size=(140, 40)) as pilot:
+        await pilot.pause()
+        await pilot.press("l"); await pilot.pause()
+        f, log = a.screen.query_one("#filter").region, a.screen.query_one("#full-log").region
+        assert f.y < log.y and log.width > 100                      # one column, full width (no main-screen grid)
+
+
+@pytest.mark.anyio
+async def test_new_task_dialog_is_centred_and_labels_every_field():
+    a, eng = app()
+    async with a.run_test(size=(140, 40)) as pilot:
+        await pilot.pause()
+        await pilot.press("i"); await pilot.pause()
+        box = a.screen.query_one("#new-task").region
+        assert abs((box.x + box.width / 2) - 70) <= 3                # centred horizontally
+        labels = " ".join(str(l.render()) for l in a.screen.query(Label))
+        assert "Repository" in labels and "Title" in labels and "What should change" in labels

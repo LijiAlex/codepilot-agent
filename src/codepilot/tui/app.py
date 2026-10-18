@@ -11,7 +11,7 @@ from rich.text import Text
 from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Vertical
+from textual.containers import Container, Vertical
 from textual.widgets import DataTable, Footer, Label, ListItem, ListView, RichLog, Static
 
 from codepilot.engine import UiCallbacks
@@ -32,7 +32,7 @@ def _short(repo: str) -> str:
 class CodePilotApp(App):
     TITLE = "CodePilot+"
     CSS = """
-    Screen { layout: grid; grid-size: 2 2; grid-columns: 1fr 1fr; grid-rows: 1fr 1fr; }
+    #main { layout: grid; grid-size: 2 2; grid-columns: 1fr 1fr; grid-rows: 1fr 1fr; }   /* main screen only */
     .panel { border: round $panel-lighten-2; padding: 0 1; }
     .panel > Label { text-style: bold; color: $text-muted; }
     .panel:focus-within { border: heavy $warning; }              /* the panel the arrow keys move in */
@@ -42,7 +42,9 @@ class CodePilotApp(App):
     #approvals:focus > ListItem.-highlight { background: $warning; color: $background; text-style: bold; }
     #approval-hint { color: $warning; text-style: bold; height: auto; }
     #inspect, #new-task, #reason { width: 90%; height: 90%; border: thick $accent; background: $surface; padding: 1; }
-    ConfirmScreen { align: center middle; }
+    ConfirmScreen, NewTaskScreen, ReasonScreen, InspectScreen { align: center middle; }
+    #new-task Label { margin-top: 1; color: $text-muted; }
+    #new-task #body { height: 8; }
     #confirm { width: 90; max-width: 95%; height: auto; border: thick $warning; background: $surface; padding: 1 2; }
     #confirm-keys { margin-top: 1; color: $text-muted; }
     """
@@ -72,6 +74,11 @@ class CodePilotApp(App):
         return call
 
     def compose(self) -> ComposeResult:
+        with Container(id="main"):
+            yield from self._panels()
+        yield Footer()
+
+    def _panels(self) -> ComposeResult:
         with Vertical(classes="panel", id="issues-panel"):
             yield Label("GitHub Issues")
             yield DataTable(id="issues", cursor_type="row", zebra_stripes=True)
@@ -85,7 +92,6 @@ class CodePilotApp(App):
             yield Label("Human Approval")
             yield ListView(id="approvals")
             yield Static("nothing waiting", id="approval-hint", markup=False)
-        yield Footer()
 
     def on_mount(self) -> None:
         self.query_one("#issues", DataTable).add_columns("Issue", "Status", "Title")

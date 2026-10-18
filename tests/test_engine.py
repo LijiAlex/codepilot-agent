@@ -107,3 +107,10 @@ def test_view_pending_carries_gate_flags_not_payloads(env):
     s.handoffs.create(rid, "o/r", "#7", "publish", {"flags": ["more_than_5_files"], "files": [f"f{i}.py" for i in range(7)], "saved": ["big"]})
     p = e.view()["pending"][0]
     assert p["flags"] == ["more_than_5_files"] and p["file_count"] == 7 and "payload_json" not in p
+
+
+def test_startup_session_note_is_one_short_line_without_empty_sessions():
+    from codepilot.engine import session_note
+    note = session_note([{"summary": "no runs"}, {"summary": "FAILED(setup: box command failed (1): cd …\nObtaining file:///x\n  noise): 1"},
+                         {"summary": "PR_OPENED: 2"}])
+    assert "\n" not in note and "no runs" not in note and "PR_OPENED: 2" in note and len(note) <= 200

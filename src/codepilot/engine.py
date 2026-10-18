@@ -20,6 +20,16 @@ from codepilot.watcher import PRWatcher
 from codepilot.worker import Outcome, Seed, WorkItem, Worker
 
 
+def session_note(sessions: list) -> str:
+    """One short line for the startup notice: skip empty sessions, first line of each summary only."""
+    parts = []
+    for sess in sessions:
+        text = " ".join((sess["summary"] or "").split())
+        if text and text != "no runs":
+            parts.append(text[:90])
+    return ("last sessions: " + " | ".join(parts))[:200] if parts else ""
+
+
 @dataclass
 class Job:
     item: WorkItem
@@ -64,7 +74,9 @@ class Engine:
         self.watcher.check()                                   # merges made while we were off (E17)
         last = self.episodic.last_sessions(3)
         if last:
-            self.ui.on_notice("last sessions: " + " | ".join(s["summary"] for s in last))
+            note = session_note(last)
+            if note:
+                self.ui.on_notice(note)
         return crashed
 
     def start(self) -> None:
@@ -207,7 +219,8 @@ class Engine:
 
     # ---- session memory ----------------------------------------------------
     def _on_run_end(self, out: Outcome) -> None:
-        self.stats[out.state if not out.reason else f"{out.state}({out.reason})"] += 1
+        reason = (out.reason or "").splitlines()[0][:40] if out.reason else ""
+        self.stats[out.state if not reason else f"{out.state}({reason})"] += 1
         self._save_session()
 
     def _save_session(self) -> None:
