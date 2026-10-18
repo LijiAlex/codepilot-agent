@@ -25,10 +25,14 @@ KIND_STYLE = {"tool_call": "cyan", "tool_result": "dim", "message": "white", "st
               "interrupt": "bold magenta", "notice": "yellow", "error": "bold red"}
 
 
+def _short(repo: str) -> str:
+    return repo.split("/", 1)[-1]
+
+
 class CodePilotApp(App):
     TITLE = "CodePilot+"
     CSS = """
-    Screen { layout: grid; grid-size: 2 2; grid-columns: 1fr 2fr; grid-rows: 1fr 1fr; }
+    Screen { layout: grid; grid-size: 2 2; grid-columns: 1fr 1fr; grid-rows: 1fr 1fr; }
     .panel { border: round $panel-lighten-2; padding: 0 1; }
     .panel > Label { text-style: bold; color: $text-muted; }
     .panel:focus-within { border: heavy $warning; }              /* the panel the arrow keys move in */
@@ -84,7 +88,7 @@ class CodePilotApp(App):
         yield Footer()
 
     def on_mount(self) -> None:
-        self.query_one("#issues", DataTable).add_columns("Issue", "Title", "Status")
+        self.query_one("#issues", DataTable).add_columns("Issue", "Status", "Title")
         self.set_interval(0.1, self.flush_logs)             # ~10 Hz: token floods never freeze the UI
         self.boot()
 
@@ -137,14 +141,23 @@ class CodePilotApp(App):
         table = self.query_one("#issues", DataTable)
         table.clear()
         self.issue_rows = []
-        for r in v["runs"]:
+        seen: set[tuple[str, str]] = set()
+        for r in v["runs"]:                                  # newest first: one row per issue, its latest run
+            key = (r["repo"], r["issue_key"])
+            if key in seen:
+                continue
+            seen.add(key)
             icon = STATE_ICON.get(r["state"], "●")
-            status = f"{icon} {r['state'].lower().replace('_', ' ')}" + (f" ({r['reason']})" if r.get("reason") else "")
-            table.add_row(Text(r["issue_key"]), Text(r["title"][:40]), Text(status))   # issue text is untrusted: never markup
+            state = "PR opened" if r["state"] == "PR_OPENED" else r["state"].lower().replace("_", " ")
+            reason = r.get("reason") or ""
+            status = f"{icon} {state}" + (f" ({reason.splitlines()[0][:22]})" if reason else "")
+            table.add_row(Text(_short(r["repo"]) + " " + r["issue_key"]), Text(status), Text(r["title"][:60]))
             self.issue_rows.append(r)
         for key, why in v["skipped"].items():                # "owner/name#N" → why the last poll skipped it
             repo, num = key.split("#", 1)
-            table.add_row(Text(f"#{num}"), "", Text(f"skipped: {why}"))
+            if (repo, f"#{num}") in seen or why == "already being processed":
+                continue                                      # already listed with its run's state
+            table.add_row(Text(f"{_short(repo)} #{num}"), Text(f"– skipped: {why}"), "")
             self.issue_rows.append({"repo": repo, "issue_key": f"#{num}"})
         approvals = self.query_one("#approvals", ListView)
         keep = self._selected_id()

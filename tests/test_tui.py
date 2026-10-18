@@ -40,7 +40,7 @@ async def test_four_panels_show_issues_task_logs_and_approvals():
         await pilot.pause()
         assert eng.calls[:2] == ["startup", "start"]
         table = a.query_one("#issues", DataTable)
-        assert table.row_count == 2 and "skipped: blocked" in str(table.get_row_at(1)[2])
+        assert table.row_count == 2 and "skipped: blocked" in str(table.get_row_at(1)[1])   # columns: Issue, Status, Title
         eng.ui.on_event(RunEvent("r1", "tool_call", "coder", "write_todos(...)",
                                  {"name": "write_todos", "args": {"todos": [{"content": "Reproduce", "status": "completed"},
                                                                             {"content": "Fix", "status": "pending"}]}}))
@@ -105,7 +105,7 @@ async def test_markup_in_untrusted_text_is_shown_literally():
     async with a.run_test(size=(140, 40)) as pilot:
         await pilot.pause()
         table = a.query_one("#issues")
-        assert evil[:40] in str(table.get_row_at(0)[1])
+        assert evil[:40] in str(table.get_row_at(0)[2])
 
 
 
@@ -153,3 +153,20 @@ async def test_reject_screen_names_the_item():
         assert isinstance(a.screen, ReasonScreen) and "o/playground #1" in str(a.screen.query_one(Label).render())
         await pilot.press("escape")
         assert not [c for c in eng.calls if c[0] == "decide"]
+
+
+@pytest.mark.anyio
+async def test_issues_panel_shows_one_row_per_issue_with_status_first():
+    a, eng = app()
+    eng.state["runs"] = [
+        {"id": "r3", "repo": "o/playground", "issue_key": "#1", "title": "Citation off by one", "state": "PR_OPENED", "reason": None},
+        {"id": "r2", "repo": "o/playground", "issue_key": "#1", "title": "Citation off by one", "state": "FAILED", "reason": "setup: x"},
+        {"id": "r1", "repo": "o/plugin", "issue_key": "task:ab12", "title": "Accents", "state": "FAILED", "reason": "tests"}]
+    eng.state["skipped"] = {"o/playground#1": "already being processed", "o/playground#10": "blocked by the injection check"}
+    async with a.run_test(size=(140, 40)) as pilot:
+        await pilot.pause()
+        t = a.query_one("#issues", DataTable)
+        rows = [[str(c) for c in t.get_row_at(i)] for i in range(t.row_count)]
+        assert [r[0] for r in rows] == ["playground #1", "plugin task:ab12", "playground #10"]
+        assert "PR opened" in rows[0][1] and "failed" in rows[1][1] and "skipped" in rows[2][1]
+        assert rows[0][2].startswith("Citation")
