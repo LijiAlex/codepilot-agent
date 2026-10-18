@@ -138,7 +138,8 @@ const render = {
     const all = Object.entries(d.lessons).flatMap(([repo, ls]) => ls.map(l => [repo.split("/").pop(), (l.task_type || "").replace(/_/g, " "), l.source, l.text]));
     m.appendChild(table(["Repo", "Type", "Source", "Lesson"], all));
     m.appendChild(el("h2", "Recent sessions"));
-    m.appendChild(el("p", "Each summary is a snapshot taken when that session ended; a run's current status is on the Runs page.", "muted"));
+    const note = el("p", "Each summary is a snapshot taken when that session ended. For each run's current status, see ", "muted");
+    const toRuns = el("a", "Runs"); toRuns.href = "#matrix"; note.appendChild(toRuns); note.appendChild(document.createTextNode(".")); m.appendChild(note);
     const sessions = d.sessions.filter(s => s.summary && s.summary !== "no runs");
     m.appendChild(table(["Started", "Summary (at session end)"], sessions.map(s => [when(s.started), tdTitle(short(friendlySummary(s.summary), 120), friendlySummary(s.summary))])));
   },

@@ -212,3 +212,9 @@ def test_run_detail_includes_the_logged_error_and_safety_names_missed_attacks(en
 def test_page_routes_by_url_and_shows_local_times():
     js = (Path(__file__).parents[1] / "src" / "codepilot" / "dashboard" / "static" / "app.js").read_text()
     assert 'addEventListener("hashchange", route)' in js and "local time" in js and "friendlySummary" in js
+
+
+def test_page_files_are_not_cached_so_updates_show(env):
+    r = env.client.get("/static/app.js", headers={"host": H["host"]})
+    assert r.status_code == 200 and r.headers.get("cache-control", "") in ("no-store", "no-cache")
+    assert env.client.get("/", headers={"host": H["host"]}).headers.get("cache-control", "") in ("no-store", "no-cache")
