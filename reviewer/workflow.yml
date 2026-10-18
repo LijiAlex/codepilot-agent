@@ -4,7 +4,7 @@
 name: CodePilot+ independent review
 on:
   pull_request:
-    types: [opened, synchronize, ready_for_review, labeled]   # labeled: only the codepilot-review label (see if:)
+    types: [synchronize, labeled]               # new commits, or the needs-review label (first review and re-reviews)
   pull_request_review:                          # a human approval can make a reviewed PR merge-ready
     types: [submitted]
 permissions: {}
@@ -14,7 +14,7 @@ env:
 jobs:
   tests:
     # Job A runs the PR's code: read-only token, no secrets, no stored credentials. Fork PRs are skipped (documented).
-    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.review.user.login != vars.REVIEWER_LOGIN && (github.event.action != 'labeled' || github.event.label.name == 'codepilot-review')
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.review.user.login != vars.REVIEWER_LOGIN && (github.event.action != 'labeled' || github.event.label.name == 'needs-review')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -35,7 +35,7 @@ jobs:
   review:
     # Job B holds the secrets and never checks out or runs the PR's code: it reads the diff through the API.
     needs: tests
-    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.review.user.login != vars.REVIEWER_LOGIN && (github.event.action != 'labeled' || github.event.label.name == 'codepilot-review')
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.review.user.login != vars.REVIEWER_LOGIN && (github.event.action != 'labeled' || github.event.label.name == 'needs-review')
     runs-on: ubuntu-latest
     permissions: {}
     steps:
@@ -70,4 +70,4 @@ jobs:
           REVIEWER_LOGIN: ${{ vars.REVIEWER_LOGIN }}
           CODEPILOT_LOGIN: ${{ vars.CODEPILOT_LOGIN }}
           JUNIT: junit.xml
-          REVIEW_LABEL: codepilot-review
+          REVIEW_LABEL: needs-review

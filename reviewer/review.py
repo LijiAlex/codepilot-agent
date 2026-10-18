@@ -175,7 +175,8 @@ def _recheck(pr, policy: dict, tests: TestSummary, bot_login: str, codepilot_log
     return {"rechecked": True, "ready": ready, "why": why}
 
 
-REVIEW_LABEL = "codepilot-review"            # a person adds it in the GitHub UI to ask for a full fresh review
+REVIEW_LABEL = "needs-review"                # asks for a review (CodePilot+ adds it on new PRs; a person re-adds it to re-review)
+DONE_LABEL = "reviewed"                      # set once a review is posted
 
 
 def run(repo, pr_number: int, model, tests: TestSummary, bot_login: str, codepilot_login: str = "", force: bool = False) -> dict:
@@ -217,8 +218,11 @@ def run(repo, pr_number: int, model, tests: TestSummary, bot_login: str, codepil
     pr.create_review(commit=repo.get_commit(pr.head.sha), body=render_body(result, ready, why, since, extra),
                      event="COMMENT", comments=inline)
     _sync_label(pr, ready)
-    if force and REVIEW_LABEL in {label.name for label in pr.labels}:
-        pr.remove_from_labels(REVIEW_LABEL)              # done: the label can be added again for another review
+    names = {label.name for label in pr.labels}
+    if REVIEW_LABEL in names:
+        pr.remove_from_labels(REVIEW_LABEL)              # done: add it again in the GitHub UI for another full review
+    if DONE_LABEL not in names:
+        pr.add_to_labels(DONE_LABEL)
     return {"score": result.score, "ready": ready, "why": why, "inline": len(inline)}
 
 
