@@ -155,3 +155,22 @@ def test_merge_needs_the_current_review_to_say_merge_ready_and_a_configured_revi
     with pytest.raises(MergeRefused):
         merge_pr(FakeRepo([FakePR(9)]), 9, "h1", None)
     assert merge_pr(FakeRepo([FakePR(10)]), 10, "h1", "rev[bot]")["merged"]
+
+
+def test_overview_says_cost_is_not_tracked_and_counts_waiting_skill_proposals(env):
+    ov = env.client.get("/api/overview", headers=H).json()
+    assert ov["cost_usd"] is None                                   # no prices configured: not "$0"
+    assert ov["proposals_waiting"] == 0 and "pending_decisions" in ov
+    from codepilot.dashboard.data import overview
+    env.conn.execute("update runs set cost_usd=0.42 where id=?", (env.rid,))
+    assert overview(env.conn, cost_tracked=True)["cost_usd"] == 0.42  # prices set in codepilot.yml
+
+
+def test_context_reports_the_repo_map_budget(env):
+    assert env.client.get("/api/context", headers=H).json()["budget"] == 4000
+
+
+def test_page_has_friendly_labels_loading_state_and_no_html_from_data():
+    js = (Path(__file__).parents[1] / "src" / "codepilot" / "dashboard" / "static" / "app.js").read_text()
+    assert '"Pull requests"' in js and "Loading" in js and "None so far" in js and "not tracked" in js
+    assert "needs an independent review" in js and "toLocaleString" in js

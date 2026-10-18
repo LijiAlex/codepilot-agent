@@ -35,6 +35,8 @@ class DashboardDeps:
     episodic: Any = None
     skills: dict | None = None
     improvements: Any = None                    # Task 30: ImprovementStore
+    map_budget: int = 4000                      # Settings.repo_map_budget_tokens
+    cost_tracked: bool = False                  # both model prices set in codepilot.yml
 
 
 class PRAction(BaseModel):
@@ -73,7 +75,7 @@ def create_app(deps: DashboardDeps, token: str, port: int) -> FastAPI:
 
     @app.get("/api/overview")
     def overview():
-        return data.overview(deps.conn)
+        return data.overview(deps.conn, deps.cost_tracked)
 
     @app.get("/api/matrix")
     def matrix():
@@ -129,7 +131,7 @@ def create_app(deps: DashboardDeps, token: str, port: int) -> FastAPI:
 
     @app.get("/api/context")
     def context():
-        return data.context(deps.conn, deps.runs_dir)
+        return data.context(deps.conn, deps.runs_dir, deps.map_budget)
 
     @app.get("/api/memory")
     def memory():

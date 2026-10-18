@@ -32,7 +32,7 @@ def start_dashboard_thread(engine, settings, config_dir: Path, port: int):
     from codepilot.skills import load_skills
     s = engine.worker.s
     improver = getattr(engine, "improver", None)
-    deps = DashboardDeps(conn=s.runs.conn, runs_dir=Path(settings.home) / "runs", results_dir=config_dir / "results",
+    deps = DashboardDeps(map_budget=settings.repo_map_budget_tokens, cost_tracked=settings.price_in_per_mtok is not None and settings.price_out_per_mtok is not None, conn=s.runs.conn, runs_dir=Path(settings.home) / "runs", results_dir=config_dir / "results",
                          repos=[r.full_name for r in settings.repos], repo_factory=engine.cs.publish.repo_factory, audit=s.audit,
                          reviewer_login=settings.reviewer_login, lessons=s.lessons, episodic=s.episodic, skills=load_skills(),
                          improvements=improver.store if improver is not None else None)
@@ -124,7 +124,7 @@ def cmd_dashboard(args) -> int:
         owner, name = full_name.split("/")
         return TokenProvider.from_env(s.github_app_id_env, s.github_app_key_path_env, owner, name)
 
-    deps = DashboardDeps(conn=conn, runs_dir=home / "runs", results_dir=path.parent / "results", repos=[r.full_name for r in s.repos],
+    deps = DashboardDeps(map_budget=s.repo_map_budget_tokens, cost_tracked=s.price_in_per_mtok is not None and s.price_out_per_mtok is not None, conn=conn, runs_dir=home / "runs", results_dir=path.parent / "results", repos=[r.full_name for r in s.repos],
                          repo_factory=lambda n: tokens(n).repo(), audit=AuditLog(conn), reviewer_login=s.reviewer_login,
                          # standalone: no ChromaDB (one process per Chroma folder); lessons show with `codepilot --dashboard PORT`
                          lessons=None, episodic=EpisodicMemory(home / "store.db"),

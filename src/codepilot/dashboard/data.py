@@ -19,15 +19,21 @@ def _events(runs_dir: Path, run_id: str, limit: int | None = None) -> list[dict]
     return [json.loads(x) for x in (lines[-limit:] if limit else lines)]
 
 
-def overview(conn: sqlite3.Connection) -> dict:
+def overview(conn: sqlite3.Connection, cost_tracked: bool = False) -> dict:
     by_state = {r["state"]: r["n"] for r in conn.execute("select state, count(*) n from runs group by state")}
     count = lambda a: conn.execute("select count(*) from events where action=?", (a,)).fetchone()[0]  # noqa: E731
-    tok = conn.execute("select coalesce(sum(tokens_in),0) ti, coalesce(sum(tokens_out),0) tout, coalesce(sum(cost_usd),0) c from runs").fetchone()
+    tok = conn.execute("select coalesce(sum(tokens_in),0) ti, coalesce(sum(tokens_out),0) tout, sum(cost_usd) c from runs").fetchone()
+    try:
+        proposals = conn.execute("select count(*) from repo_skill_proposals where status='pending'").fetchone()[0]
+    except sqlite3.OperationalError:                   # improvement loop tables not created yet
+        proposals = 0
     return {"runs": sum(by_state.values()), "by_state": by_state,
             "prs_opened": conn.execute("select count(*) from runs where pr_url is not null").fetchone()[0],
             "pending_decisions": conn.execute("select count(*) from handoffs where status='pending'").fetchone()[0],
             "commands_refused": count("command_refused"), "issues_blocked": count("issue_blocked"),
-            "tokens_in": tok["ti"], "tokens_out": tok["tout"], "cost_usd": round(tok["c"], 2)}
+            "proposals_waiting": proposals,
+            "tokens_in": tok["ti"], "tokens_out": tok["tout"],
+            "cost_usd": round(tok["c"] or 0, 2) if cost_tracked else None}      # None = no prices in codepilot.yml
 
 
 def _stage_marks(conn, runs_dir: Path, run: sqlite3.Row) -> dict[str, str]:
@@ -92,14 +98,14 @@ def safety(conn, results_dir: Path) -> dict:
             "guardrail_measurement": json.loads(g.read_text()) if g.exists() else None}
 
 
-def context(conn, runs_dir: Path) -> dict:
+def context(conn, runs_dir: Path, budget: int = 4000) -> dict:
     out = []
     for r in conn.execute("select * from runs where task_type is not null order by created_at desc limit 100"):
         ctx = next((e["data"] for e in _events(runs_dir, r["id"]) if e["kind"] == "notice"
                     and e.get("data", {}).get("kind") == "context"), None)
         out.append({"run_id": r["id"], "issue": r["issue_key"], "repo": r["repo"], "tokens_in": r["tokens_in"],
                     "tokens_out": r["tokens_out"], "context": ctx})
-    return {"runs": out}
+    return {"runs": out, "budget": budget}
 
 
 def memory(lessons: Any, episodic: Any, repos: list[str]) -> dict:

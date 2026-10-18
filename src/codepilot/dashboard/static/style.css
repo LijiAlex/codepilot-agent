@@ -19,3 +19,17 @@ pre { white-space: pre-wrap; background: var(--card); border: 1px solid var(--li
 .muted { color: var(--muted); }
 button.danger { color: var(--bad); }
 .table-wrap { overflow-x: auto; }
+.page-intro { color: var(--muted); margin: 0 0 12px; }
+.loading { font-style: italic; }
+.small { font-size: 12px; }
+.back { display: inline-block; margin-bottom: 8px; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+td.actions button { margin: 0 4px 4px 0; }
+pre.diff span.add { color: var(--ok); }
+pre.diff span.del { color: var(--bad); }
+pre.diff span.hunk { color: var(--accent); }
+details { margin: 8px 0; }
+details > summary { cursor: pointer; font-weight: 600; }
+code { background: color-mix(in srgb, var(--accent) 12%, transparent); padding: 0 3px; border-radius: 3px; }
+/* narrow screens: keep the first column (run / issue / PR) visible while the table scrolls */
+.table-wrap th:first-child, .table-wrap td:first-child { position: sticky; left: 0; background: var(--card); z-index: 1; }
