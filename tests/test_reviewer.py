@@ -171,3 +171,10 @@ def test_workflow_runs_on_new_commits_and_the_pending_label_only():
     assert sorted(on["pull_request"]["types"]) == ["labeled", "synchronize"]
     for job in wf["jobs"].values():
         assert "github.event.action != 'labeled' || github.event.label.name == 'codepilot-review-pending'" in job["if"]
+
+
+def test_reviewer_model_uses_the_default_temperature():
+    # live 2026-10-18: OpenAI 400 "Unsupported value: 'temperature'" for the reviewer model
+    src = (ROOT / "reviewer" / "review.py").read_text()
+    call = src[src.index("ChatOpenAI("):].split(")", 1)[0]
+    assert "temperature" not in call
