@@ -174,3 +174,22 @@ def test_page_has_friendly_labels_loading_state_and_no_html_from_data():
     js = (Path(__file__).parents[1] / "src" / "codepilot" / "dashboard" / "static" / "app.js").read_text()
     assert '"Pull requests"' in js and "Loading" in js and "None so far" in js and "not tracked" in js
     assert "needs an independent review" in js and "toLocaleString" in js
+
+
+def test_dashboard_token_survives_a_restart_and_is_private(tmp_path, monkeypatch, capsys):
+    import os, stat
+    import codepilot.cli as cli
+    cfg = tmp_path / "codepilot.yml"
+    cfg.write_text(f"repos:\n  - owner: o\n    name: r\nhome: {tmp_path / 'home'}\n")
+    monkeypatch.setattr("uvicorn.run", lambda app, host, port, log_level: None)
+    cli.main(["--config", str(cfg), "dashboard", "--port", "8799"]); first = capsys.readouterr().out
+    cli.main(["--config", str(cfg), "dashboard", "--port", "8799"]); second = capsys.readouterr().out
+    tok = lambda s: re.search(r"#token=([A-Za-z0-9_-]+)", s).group(1)
+    assert tok(first) == tok(second)                                 # an open tab keeps working after a restart
+    f = tmp_path / "home" / "dashboard-token"
+    assert stat.S_IMODE(os.stat(f).st_mode) == 0o600
+
+
+def test_page_explains_an_out_of_date_link():
+    js = (Path(__file__).parents[1] / "src" / "codepilot" / "dashboard" / "static" / "app.js").read_text()
+    assert "access link is out of date" in js

@@ -33,6 +33,7 @@ async function api(path, body) {
   if (body) { opts.method = "POST"; opts.headers["Content-Type"] = "application/json"; opts.body = JSON.stringify(body); }
   const r = await fetch("/api/" + path, opts);
   const j = await r.json().catch(() => ({}));
+  if (r.status === 401) throw new Error("this page's access link is out of date or missing — open the link printed by `codepilot dashboard` (it stays the same across restarts)");
   if (!r.ok) throw new Error(j.detail || j.error || r.status);
   return j;
 }

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+import os
+import secrets
 import sys
 from pathlib import Path
 
@@ -20,10 +22,23 @@ def _config_path(arg: str | None) -> Path:
     raise SystemExit("no codepilot.yml found (copy codepilot.example.yml to codepilot.yml)")
 
 
+def dashboard_token(home: Path) -> str:
+    """One access token per CodePilot+ home, kept in a file only the user can read, so a restart does not lock out
+    an open tab. Delete the file to issue a new one."""
+    f = Path(home) / "dashboard-token"
+    if f.exists() and f.read_text().strip():
+        return f.read_text().strip()
+    f.parent.mkdir(parents=True, exist_ok=True)
+    tok = secrets.token_urlsafe(24)
+    fd = os.open(f, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as fh:
+        fh.write(tok)
+    return tok
+
+
 def start_dashboard_thread(engine, settings, config_dir: Path, port: int):
     """Plus: the dashboard inside the TUI process, sharing its database and its ChromaDB client
     (ChromaDB does not support two processes on one folder)."""
-    import secrets
     import threading
 
     import uvicorn
@@ -36,7 +51,7 @@ def start_dashboard_thread(engine, settings, config_dir: Path, port: int):
                          repos=[r.full_name for r in settings.repos], repo_factory=engine.cs.publish.repo_factory, audit=s.audit,
                          reviewer_login=settings.reviewer_login, lessons=s.lessons, episodic=s.episodic, skills=load_skills(),
                          improvements=improver.store if improver is not None else None)
-    token = secrets.token_urlsafe(24)
+    token = dashboard_token(Path(settings.home))
     server = uvicorn.Server(uvicorn.Config(create_app(deps, token, port), host="127.0.0.1", port=port, log_level="warning"))
     thread = threading.Thread(target=server.run, daemon=True, name="dashboard")
     thread.start()
@@ -129,7 +144,7 @@ def cmd_dashboard(args) -> int:
                          # standalone: no ChromaDB (one process per Chroma folder); lessons show with `codepilot --dashboard PORT`
                          lessons=None, episodic=EpisodicMemory(home / "store.db"),
                          skills=load_skills(), improvements=ImprovementStore(conn, RepoSkillStore(conn)))
-    token = secrets.token_urlsafe(24)
+    token = dashboard_token(home)
     print(f"CodePilot+ dashboard: http://127.0.0.1:{args.port}/#token={token}  (this link is the password; Ctrl-C to stop)")
     uvicorn.run(create_app(deps, token, args.port), host="127.0.0.1", port=args.port, log_level="warning")
     return 0
