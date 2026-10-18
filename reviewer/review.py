@@ -175,8 +175,8 @@ def _recheck(pr, policy: dict, tests: TestSummary, bot_login: str, codepilot_log
     return {"rechecked": True, "ready": ready, "why": why}
 
 
-REVIEW_LABEL = "needs-review"                # asks for a review (CodePilot+ adds it on new PRs; a person re-adds it to re-review)
-DONE_LABEL = "reviewed"                      # set once a review is posted
+REVIEW_LABEL = "codepilot-review-pending"    # asks for a review (CodePilot+ adds it on new PRs; a person re-adds it to re-review)
+DONE_LABEL = "codepilot-review-completed"   # set once a review is posted (the brief's needs-review label stays: a person still reviews)
 
 
 def run(repo, pr_number: int, model, tests: TestSummary, bot_login: str, codepilot_login: str = "", force: bool = False) -> dict:

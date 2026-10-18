@@ -14,7 +14,7 @@ from codepilot.gh.writer import ensure_labels
 from codepilot.repomap.build import build_repo_map, scan
 from codepilot.repomap.cache import RepoMapCache
 
-LABELS = ["ai-assignable", "codepilot-generated", "needs-review"]
+LABELS = ["ai-assignable", "codepilot-generated", "needs-review", "codepilot-review-pending", "codepilot-review-completed"]
 OTHER_LANGS = {"package.json": "JavaScript", "go.mod": "Go", "Cargo.toml": "Rust", "pom.xml": "Java", "Gemfile": "Ruby"}
 
 

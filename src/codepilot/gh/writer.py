@@ -15,8 +15,9 @@ from codepilot.changes import SavedFile
 
 BRANCH_RE = re.compile(r"^codepilot/(issue-\d+|task-[0-9a-z]{4,12})-[a-z0-9]+(-[a-z0-9]+)*$")
 SUBJECT_RE = re.compile(r"^(fix|feat|docs|chore|build|test|refactor)\((#\d+|task-[0-9a-z]{4,12})\): \S.{0,71}$")
-PR_LABELS = ["codepilot-generated", "needs-review"]
-LABEL_COLORS = {"codepilot-generated": "5319e7", "needs-review": "fbca04", "ai-assignable": "0e8a16"}
+PR_LABELS = ["codepilot-generated", "needs-review", "codepilot-review-pending"]   # brief labels + asks the reviewer
+LABEL_COLORS = {"codepilot-generated": "5319e7", "needs-review": "fbca04", "ai-assignable": "0e8a16",
+                "codepilot-review-pending": "d4c5f9", "codepilot-review-completed": "0e8a16"}
 
 
 class PublishError(ValueError):

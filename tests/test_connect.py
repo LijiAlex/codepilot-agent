@@ -47,7 +47,7 @@ def test_connect_end_to_end_with_local_mirror_and_config_write(tmp_path):
     skills = RepoSkillStore(db_connect(tmp_path / "cp.db"))
     fake = FakeRepo()
     rep = connect("o", "r", home, repo_factory=lambda n: fake, mirror=HostMirror(home), skills=skills, config_path=cfg)
-    assert set(rep.labels_created) == {"ai-assignable", "codepilot-generated", "needs-review"} and "bug" in fake.labels
+    assert set(rep.labels_created) == {"ai-assignable", "codepilot-generated", "needs-review", "codepilot-review-pending", "codepilot-review-completed"} and "bug" in fake.labels
     assert rep.setup.install_command == "pip install -e . pytest" and rep.map_files >= 3 and rep.repo_skill_version == 1
     assert rep.config_written and rep.snapshot is None
     s = load_settings(cfg)

@@ -109,7 +109,7 @@ def test_one_commit_with_all_changes_labels_and_review_request():
     assert repo.commits[sha].parents[0].sha == "base" and "CodePilot-Run: r1" in repo.commits[sha].message
     assert repo.refs["heads/codepilot/issue-7-empty-title"] == sha
     pr = repo.pulls[0]
-    assert {"codepilot-generated", "needs-review"} <= pr.labels and {"codepilot-generated", "needs-review"} <= repo.labels
+    assert {"codepilot-generated", "needs-review", "codepilot-review-pending"} <= pr.labels and {"codepilot-generated", "needs-review", "codepilot-review-pending"} <= repo.labels
     assert requested and pr.reviewers == ["alice"] and num == 1
 
 

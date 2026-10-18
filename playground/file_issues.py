@@ -17,7 +17,8 @@ from pathlib import Path
 import yaml
 
 HERE = Path(__file__).parent
-LABELS = {"ai-assignable": "0e8a16", "codepilot-generated": "5319e7", "needs-review": "fbca04"}
+LABELS = {"ai-assignable": "0e8a16", "codepilot-generated": "5319e7", "needs-review": "fbca04",
+          "codepilot-review-pending": "d4c5f9", "codepilot-review-completed": "0e8a16"}
 
 
 def number_from_url(url: str) -> int:
