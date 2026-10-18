@@ -362,6 +362,11 @@ class Worker:
                 return self._finish(rec, run_id, item, RunState.AWAITING_APPROVAL, entry, hid)
             fc = check_changes(to_file_changes(saved, mpath, base_sha), set(subagent_paths(translator.final_text.get("repo-explorer", ""))),
                                repo.protected_paths, tr.task_type, repo_had_no_tests=attempts.saw_no_tests)
+            if not saved:                                           # the agents chose not to change anything: say why
+                said = (translator.final_text.get("orchestrator", "") or "").strip().splitlines()
+                reason = "no change made — " + (said[0][:200] if said else "the agents ended without a change")
+                self._failure_lesson(item, tr.task_type, reason, run_id)
+                return self._finish(rec, run_id, item, RunState.FAILED, reason)
             if not fc.ok:
                 reason = "file_check: " + "; ".join(fc.problems)
                 self._failure_lesson(item, tr.task_type, reason, run_id)

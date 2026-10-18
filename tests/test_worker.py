@@ -337,3 +337,12 @@ def test_setup_failure_is_in_the_audit_log_with_the_full_error_tail(env):
     assert out.reason.startswith("setup:")
     ev = [e for e in s.audit.for_run(rid) if e["action"] == "run_error"]
     assert ev and "requires a different Python" in ev[0]["detail_json"] and len(ev[0]["detail_json"]) < 2600
+
+
+def test_a_run_that_changes_nothing_says_why_in_the_agents_words(env):
+    orch = [tool_call("task", {"description": "find", "subagent_type": "repo-explorer"}, "o1"),
+            AIMessage(content="I haven't changed anything, because the issue conflicts with a protected contract test.\n\n- details")]
+    s = services(env, base_scripts(orchestrator=orch))
+    it = item(env); rid = claim(env, it)
+    out = Worker(s).run(it, rid)
+    assert out.state == "FAILED" and out.reason.startswith("no change made — I haven't changed anything, because the issue conflicts")
