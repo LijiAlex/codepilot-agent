@@ -9,12 +9,18 @@ import sys
 from pathlib import Path
 
 
+
+def cell(text: str, limit: int = 80) -> str:
+    """One Markdown table cell: one line, no unescaped pipes, shortened."""
+    flat = " ".join(str(text).split()).replace("|", "\\|")
+    return flat if len(flat) <= limit else flat[:limit - 1] + "…"
+
 def scoreboard(conn: sqlite3.Connection) -> str:
     conn.row_factory = sqlite3.Row
     runs = conn.execute("select * from runs order by created_at").fetchall()
     by_state: dict[str, int] = {}
     for r in runs:
-        k = r["state"] + (f" ({r['reason']})" if r["reason"] and r["state"] in ("FAILED", "SKIPPED", "CLOSED") else "")
+        k = r["state"] + (f" ({cell(r['reason'])})" if r["reason"] and r["state"] in ("FAILED", "SKIPPED", "CLOSED") else "")
         by_state[k] = by_state.get(k, 0) + 1
     ev = lambda action: conn.execute("select count(*) from events where action=?", (action,)).fetchone()[0]  # noqa: E731
     lines = ["| Measure | Value |", "|---|---|", f"| Runs | {len(runs)} |",
@@ -29,7 +35,7 @@ def scoreboard(conn: sqlite3.Connection) -> str:
     lines += [f"| {k} | {v} |" for k, v in sorted(by_state.items())]
     lines += ["", "| Run | Issue | Type | Complexity | Outcome | PR |", "|---|---|---|---|---|---|"]
     lines += [f"| `{r['id']}` | {r['repo']} {r['issue_key']} | {r['task_type'] or '-'} | {r['complexity'] or '-'} | "
-              f"{r['state']}{' (' + r['reason'] + ')' if r['reason'] else ''} | {r['pr_url'] or '-'} |" for r in runs]
+              f"{r['state']}{' (' + cell(r['reason']) + ')' if r['reason'] else ''} | {r['pr_url'] or '-'} |" for r in runs]
     return "\n".join(lines) + "\n"
 
 
