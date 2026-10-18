@@ -114,7 +114,12 @@ def test_workflow_security_properties():
     tests_text = yaml.safe_dump(jobs["tests"])
     assert "secrets." not in tests_text and jobs["tests"]["steps"][0]["with"]["persist-credentials"] is False
     review_checkouts = [s for s in jobs["review"]["steps"] if s.get("uses", "").startswith("actions/checkout")]
-    assert review_checkouts and all(s["with"]["repository"] == "LijiAlex/codepilot-agent" for s in review_checkouts)
+    # the reviewer code is read from the PR's BASE commit (a PR cannot change the reviewer that judges it), only its folder
+    assert review_checkouts and all(s["with"]["ref"] == "${{ github.event.pull_request.base.sha }}"
+                                    and s["with"]["sparse-checkout"].strip() == ".github/codepilot-review"
+                                    and s["with"]["persist-credentials"] is False and "repository" not in s["with"] for s in review_checkouts)
+    run_steps = " ".join(s.get("run", "") for s in jobs["review"]["steps"])
+    assert "cp/.github/codepilot-review/review.py" in run_steps and "cp/.github/codepilot-review/requirements.txt" in run_steps
     for job in jobs.values():
         assert job["if"].startswith("github.event.pull_request.head.repo.full_name == github.repository")
         for s in job["steps"]:

@@ -1,4 +1,5 @@
-# reviewer/workflow.yml — a person copies this to .github/workflows/codepilot-review.yml in the target repo
+# reviewer/workflow.yml — a person copies this to .github/workflows/codepilot-review.yml in the target repo, and
+# reviewer/{review.py,requirements.txt,policy.yaml} to .github/codepilot-review/ (policy also to .github/codepilot-review.yaml)
 # (CodePilot+ itself may not edit .github/). Actions are pinned to commit SHAs at least 7 days old (checked 2026-10-17).
 name: CodePilot+ independent review
 on:
@@ -48,24 +49,24 @@ jobs:
           permission-issues: write
           permission-contents: read
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          repository: LijiAlex/codepilot-agent
-          ref: v1.0.0                           # Task 28 Step 3: replace with the tag's full commit SHA once it exists
+        with:                                   # the reviewer as it is on the BASE branch: a PR cannot change its own judge
+          ref: ${{ github.event.pull_request.base.sha }}
+          sparse-checkout: .github/codepilot-review
           path: cp
           persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
-      - run: pip install -r cp/reviewer/requirements.txt
+      - run: pip install -r cp/.github/codepilot-review/requirements.txt
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           name: junit
         continue-on-error: true
-      - run: python cp/reviewer/review.py
+      - run: python cp/.github/codepilot-review/review.py
         env:
           REVIEWER_TOKEN: ${{ steps.app.outputs.token }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          REVIEWER_MODEL: gpt-6.1-sol
+          REVIEWER_MODEL: ${{ vars.REVIEWER_MODEL || 'gpt-6.1-sol' }}
           REVIEWER_LOGIN: ${{ vars.REVIEWER_LOGIN }}
           CODEPILOT_LOGIN: ${{ vars.CODEPILOT_LOGIN }}
           JUNIT: junit.xml
