@@ -175,7 +175,10 @@ def _recheck(pr, policy: dict, tests: TestSummary, bot_login: str, codepilot_log
     return {"rechecked": True, "ready": ready, "why": why}
 
 
-def run(repo, pr_number: int, model, tests: TestSummary, bot_login: str, codepilot_login: str = "") -> dict:
+REVIEW_LABEL = "codepilot-review"            # a person adds it in the GitHub UI to ask for a full fresh review
+
+
+def run(repo, pr_number: int, model, tests: TestSummary, bot_login: str, codepilot_login: str = "", force: bool = False) -> dict:
     pr = repo.get_pull(pr_number)
     base = pr.base.sha
     try:
@@ -186,7 +189,7 @@ def run(repo, pr_number: int, model, tests: TestSummary, bot_login: str, codepil
         rules = repo.get_contents("AGENTS.md", ref=base).decoded_content.decode()
     except Exception:                                   # noqa: BLE001
         rules = ""
-    files, since = review_files(repo, pr, bot_login)
+    files, since = (list(pr.get_files()), None) if force else review_files(repo, pr, bot_login)
     if not files:                                       # e.g. a human approval at a commit already reviewed
         return _recheck(pr, policy, tests, bot_login, codepilot_login)
     m = CLOSES.search(pr.body or "")
@@ -214,6 +217,8 @@ def run(repo, pr_number: int, model, tests: TestSummary, bot_login: str, codepil
     pr.create_review(commit=repo.get_commit(pr.head.sha), body=render_body(result, ready, why, since, extra),
                      event="COMMENT", comments=inline)
     _sync_label(pr, ready)
+    if force and REVIEW_LABEL in {label.name for label in pr.labels}:
+        pr.remove_from_labels(REVIEW_LABEL)              # done: the label can be added again for another review
     return {"score": result.score, "ready": ready, "why": why, "inline": len(inline)}
 
 
@@ -224,8 +229,10 @@ def main() -> int:
     gh = Github(auth=Auth.Token(os.environ["REVIEWER_TOKEN"]))
     repo = gh.get_repo(os.environ["GITHUB_REPOSITORY"])
     model = ChatOpenAI(model=os.environ.get("REVIEWER_MODEL", "gpt-6.1-sol"), temperature=0, timeout=180, max_retries=2)
+    label = os.environ.get("REVIEW_LABEL", REVIEW_LABEL)
+    force = event.get("action") == "labeled" and (event.get("label") or {}).get("name") == label
     out = run(repo, event["pull_request"]["number"], model, parse_junit(Path(os.environ.get("JUNIT", "junit.xml"))),
-              os.environ.get("REVIEWER_LOGIN", "codepilot-reviewer[bot]"), os.environ.get("CODEPILOT_LOGIN", ""))
+              os.environ.get("REVIEWER_LOGIN", "codepilot-reviewer[bot]"), os.environ.get("CODEPILOT_LOGIN", ""), force=force)
     print(json.dumps(out))
     return 0
 

@@ -147,3 +147,21 @@ def test_workflow_ignores_the_reviewers_own_reviews():
     wf = yaml.safe_load((ROOT / "reviewer" / "workflow.yml").read_text())
     for job in wf["jobs"].values():
         assert "github.event.review.user.login != vars.REVIEWER_LOGIN" in job["if"]
+
+
+def test_adding_the_review_label_forces_a_full_fresh_review_and_removes_the_label():
+    pr = FakePR(reviews=[NS(user=NS(login="rev[bot]"), commit_id="h2", state="COMMENTED", body="**Score:** 9/10")],
+                labels=["codepilot-review"])
+    out = rv.run(FakeRepo(pr), 7, FakeClaude(responses=[tool_call("ReviewResult", REVIEW, "1")]), rv.TestSummary(passed=3),
+                 "rev[bot]", "codepilot-plus[bot]", force=True)
+    assert out["score"] == 9 and len(pr.created) == 1 and "changes since" not in pr.created[0][1]    # whole PR, not a delta
+    assert "codepilot-review" in pr.removed
+
+
+def test_workflow_runs_on_the_review_label_only():
+    wf = yaml.safe_load((ROOT / "reviewer" / "workflow.yml").read_text())
+    on = wf[True] if True in wf else wf["on"]
+    assert "labeled" in on["pull_request"]["types"]
+    for job in wf["jobs"].values():
+        assert "github.event.action != 'labeled' || github.event.label.name == 'codepilot-review'" in job["if"]
+    assert "REVIEW_LABEL" in yaml.safe_dump(wf["jobs"]["review"])
