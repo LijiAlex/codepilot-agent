@@ -1,5 +1,6 @@
 # tests/test_daytona_sandbox.py
 import os
+import shutil
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -129,3 +130,25 @@ def test_change_capture_through_the_box_adapter(tmp_path, mirror):
     h.backend.edit("/sandbox/pkg/a.py", "x = 1", "x = 2")
     saved = {s.path: s for s in capture_changes(h.backend, sha)}
     assert saved["pkg/new.py"].content() == b"n = 1\n" and saved["pkg/a.py"].content() == b"x = 2\n"
+
+
+@pytest.mark.skipif(not (shutil.which("uv") and Path("/usr/local/bin/python3.11").exists()), reason="needs uv and a local 3.11")
+def test_box_venv_follows_the_repos_requires_python(tmp_path, mirror):
+    # live 2026-10-17: the default Daytona image is Python 3.14; the playground needs 3.12 → `pip install -e .` failed
+    m, _ = mirror
+    (m / "pyproject.toml").write_text('[project]\nname = "r"\nversion = "0"\nrequires-python = ">=3.11,<3.12"\n')
+    subprocess.run(["git", "add", "."], cwd=m, check=True)
+    subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "py"], cwd=m, check=True)
+    sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=m, capture_output=True, text=True).stdout.strip()
+    prov, _ = provider(tmp_path, FakeClient())
+    h = prov.create("run7", "o", "r", sha, install_command="python -c 'import pip'")
+    out = h.backend.execute("python --version").output
+    assert "Python 3.11" in out, out
+
+
+def test_setup_error_keeps_the_end_of_the_output():
+    from codepilot.worker import setup_reason
+    err = SandboxSetupError("box command failed (1): cd …\nObtaining file:///x\n" + "noise\n" * 50
+                            + "ERROR: Package 'r' requires a different Python: 3.14.4 not in '>=3.12,<3.13'")
+    r = setup_reason(err)
+    assert r.startswith("setup: box command failed (1)") and "requires a different Python" in r and len(r) <= 300

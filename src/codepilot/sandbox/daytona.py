@@ -18,6 +18,11 @@ from codepilot.sandbox.prefixed import CwdSandbox, PrefixedSandbox
 LABEL = "codepilot_run"
 
 
+# uv (present in Daytona's default image) picks a Python that satisfies the repo's requires-python / .python-version,
+# fetching it if needed; the default image is 3.14 and most projects pin lower. --seed adds pip for install commands.
+VENV = '(cd sandbox && command -v uv >/dev/null 2>&1 && uv venv --seed -q "$(cd .. && pwd)/.venv") || python3 -m venv .venv'
+
+
 class SandboxSetupError(RuntimeError):
     pass
 
@@ -80,7 +85,7 @@ class DaytonaSandboxProvider:
             q = shlex.quote
             self._run(box, f"cd {q(root)} && git clone --quiet repo.bundle sandbox && rm repo.bundle"
                            f" && git -C sandbox checkout --quiet --detach {q(base_sha)}"
-                           f" && git -C sandbox remote remove origin && python3 -m venv .venv")
+                           f" && git -C sandbox remote remove origin && {VENV}")
             activate = ". .venv/bin/activate"
             if install_command:                 # by code, before any agent runs
                 self._run(box, f"cd {q(root)} && {activate} && cd sandbox && {install_command}", timeout=900)

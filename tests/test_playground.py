@@ -45,12 +45,13 @@ def test_layered_memory_issues_are_genuine_and_testable():
     assert all(i["hidden"] and i["expect"] == "pr" for i in issues)
 
 
-def test_file_issues_dry_run_and_url_parsing(capsys):
+def test_file_issues_dry_run_and_url_parsing(capsys, tmp_path):
     fi = load("playground/file_issues.py", "file_issues")
     assert fi.number_from_url("https://github.com/LijiAlex/codepilot-playground/issues/12\n") == 12
-    assert fi.main(["--repo", "o/r", "--only", "citation-off-by-one"]) == 0
+    filed = ["--filed", str(tmp_path / "filed.json")]             # never the real record of filed issues
+    assert fi.main(["--repo", "o/r", "--only", "citation-off-by-one", *filed]) == 0
     assert "would run: gh issue create --repo o/r" in capsys.readouterr().out
-    assert fi.main(["--repo", "o/r"]) == 0
+    assert fi.main(["--repo", "o/r", *filed]) == 0
     assert "same identifier is reported twice" not in capsys.readouterr().out          # held back unless named
 
 

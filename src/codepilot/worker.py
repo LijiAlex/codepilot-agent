@@ -38,6 +38,15 @@ SLUG_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+){0,7}$")
 _READ_ONLY = {"git", "ls", "cat", "head", "tail", "grep", "find", "wc", "echo", "pwd", "tree", "diff", "sort", "uniq", "cd", "true"}
 
 
+def setup_reason(e: Exception) -> str:
+    """First line (which command) + the last lines (why it failed): pip puts the cause at the end."""
+    lines = [ln for ln in redact(str(e)).splitlines() if ln.strip()]
+    if len(lines) <= 2:
+        return ("setup: " + " | ".join(lines))[:300]
+    tail = " | ".join(lines[-2:])
+    return f"setup: {lines[0][:80]} … {tail[-200:]}"
+
+
 def _runs_tests(argv: list[str]) -> bool:
     prog = argv[0].rsplit("/", 1)[-1]
     return prog == "pytest" or (prog in ("python", "python3") and argv[1:3] == ["-m", "pytest"])
@@ -368,7 +377,7 @@ class Worker:
         except TriageError as e:
             return self._finish(rec, run_id, item, RunState.FAILED, f"triage: {redact(str(e))[:200]}")
         except SandboxSetupError as e:
-            return self._finish(rec, run_id, item, RunState.FAILED, f"setup: {redact(str(e))[:200]}")
+            return self._finish(rec, run_id, item, RunState.FAILED, setup_reason(e))
         except (ModelCallLimitExceededError, ToolCallLimitExceededError):
             return self._finish(rec, run_id, item, RunState.FAILED, "step_limit")
         except TimeLimitExceeded:

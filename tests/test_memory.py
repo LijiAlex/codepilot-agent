@@ -103,3 +103,12 @@ def test_later_record_keeps_earlier_fields(tmp_path):
     em.record_run("o/r", "r1", "o/r#1", "DONE", "merged", "t")
     e = em.episodes("o/r")[0]
     assert (e["outcome"], e["task_type"], e["files"], e["duration_s"]) == ("DONE", "bug_fix", ["a.py"], 61.5)
+
+
+def test_infrastructure_failures_do_not_block_a_retry(tmp_path):
+    em = EpisodicMemory(tmp_path / "episodic.db")
+    em.save_session("s1", "x", {}); time.sleep(0.002)
+    em.record_run("o/r", "r1", "o/r#1", "FAILED", "setup: box command failed (1): cd … requires a different Python", "")
+    em.record_run("o/r", "r2", "o/r#2", "FAILED", "sandbox_lost", "")
+    em.record_run("o/r", "r3", "o/r#3", "FAILED", "tests", "")
+    assert em.recently_failed("o/r") == {"o/r#3"}

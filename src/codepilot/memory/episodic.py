@@ -12,7 +12,8 @@ from pathlib import Path
 
 from langgraph.store.sqlite import SqliteStore
 
-NOT_A_FAILURE = {"crashed"}                     # E11: a crash says nothing about the issue
+NOT_A_FAILURE = {"crashed", "sandbox_lost"}     # E11: a crash or a lost box says nothing about the issue
+INFRA_PREFIXES = ("setup:",)                    # the sandbox could not be prepared (image, install): not the issue's fault
 
 
 class EpisodicMemory:
@@ -64,4 +65,5 @@ class EpisodicMemory:
             return set()
         since = min(s["started"] for s in sessions)
         return {e["issue_key"] for e in self.episodes(repo)
-                if e["ts"] >= since and e["outcome"] == "FAILED" and e["reason"] not in NOT_A_FAILURE}
+                if e["ts"] >= since and e["outcome"] == "FAILED" and e["reason"] not in NOT_A_FAILURE
+                and not str(e["reason"] or "").startswith(INFRA_PREFIXES)}
