@@ -106,7 +106,7 @@ class LogScreen(Screen[None]):
 
     def compose(self) -> ComposeResult:
         yield Input(placeholder="filter: agent name or text", id="filter")
-        yield RichLog(id="full-log", wrap=True, markup=True)
+        yield RichLog(id="full-log", wrap=True, markup=True, min_width=20)
         yield Footer()
 
     def on_mount(self) -> None:

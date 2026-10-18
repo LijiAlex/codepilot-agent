@@ -87,7 +87,7 @@ class CodePilotApp(App):
             yield Static("idle — waiting for issues", id="task", markup=False)
         with Vertical(classes="panel", id="logs-panel"):
             yield Label("Agent Logs")
-            yield RichLog(id="logs", wrap=True, markup=True, max_lines=2000)
+            yield RichLog(id="logs", wrap=True, markup=True, max_lines=2000, min_width=20)   # wrap to the panel, never scroll sideways
         with Vertical(classes="panel", id="approval-panel"):
             yield Label("Human Approval")
             yield ListView(id="approvals")

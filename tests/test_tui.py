@@ -205,3 +205,14 @@ async def test_selecting_an_issue_row_shows_that_runs_past_log():
         await pilot.press("enter"); await pilot.pause()
         text = "\n".join(str(line.text) for line in a.query_one("#logs", RichLog).lines)
         assert "past log" in text and "edited slugs.py" in text and "2 passed" in text
+
+
+@pytest.mark.anyio
+async def test_log_lines_wrap_to_a_narrow_panel_instead_of_scrolling_sideways():
+    a, eng = app()
+    async with a.run_test(size=(110, 35)) as pilot:                   # panel narrower than 78 columns
+        await pilot.pause()
+        a.on_notice("approve: published — https://github.com/LijiAlex/codepilot-playground/pull/15 and a long tail of words here")
+        await pilot.pause(0.3)
+        log = a.query_one("#logs", RichLog)
+        assert log.scroll_x == 0 and log.virtual_size.width <= log.scrollable_content_region.width
