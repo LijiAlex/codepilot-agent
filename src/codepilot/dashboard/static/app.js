@@ -538,7 +538,7 @@ document.addEventListener("DOMContentLoaded", () => {
   GROUPS.forEach(([name, pages]) => {
     const g = el("div", null, "nav-group");
     if (name) { g.appendChild(el("span", name, "nav-label")); g.setAttribute("role", "group"); g.setAttribute("aria-label", name); }
-    pages.forEach(p => { const b = el("button", PAGES.find(x => x[0] === p)[1]); b.dataset.page = p; b.addEventListener("click", () => { location.hash = p; }); g.appendChild(b); });
+    pages.forEach(p => { const info = PAGES.find(x => x[0] === p), b = el("button", info[1]); b.dataset.page = p; b.title = info[2]; b.addEventListener("click", () => { location.hash = p; }); g.appendChild(b); });
     nav.appendChild(g);
   });
   const st = document.getElementById("status");

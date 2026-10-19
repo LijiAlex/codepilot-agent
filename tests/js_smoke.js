@@ -47,7 +47,11 @@ vm.runInContext(fs.readFileSync(appJs, "utf8") + "\nthis.__render = render; this
     try { await ctx.__render[page](node("main")); } catch (e) { errors[page] = String(e && e.stack || e).split("\n").slice(0, 3).join(" | "); }
   }
   try { await ctx.__showRun("x"); } catch (e) { errors.run = String(e); }
+  const made = [], create = doc.createElement; doc.createElement = t => { const n = create(t); made.push(n); return n; };
   try { doc.__ready(); } catch (e) { errors.nav = String(e); }        // builds the grouped tab bar
+  doc.createElement = create;
+  const tabs = made.filter(n => n.tagName === "button" && n.dataset.page);
+  if (tabs.length !== ctx.__pages.length || tabs.some(b => !b.title)) errors.tabs = "every tab needs a hover description";
   const grouped = ctx.__groups.flatMap(g => g[1]).sort().join(), all = ctx.__pages.map(p => p[0]).sort().join();
   if (grouped !== all) errors.groups = "every page must be in exactly one nav group: " + grouped + " vs " + all;
   console.log(JSON.stringify(errors));
