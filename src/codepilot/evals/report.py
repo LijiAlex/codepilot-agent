@@ -124,6 +124,7 @@ def to_markdown(rep: dict) -> str:
         out += ["", "## Golden issues", "", "| issue | type | expected | ended | reached | hidden test |", "|---|---|---|---|---|---|"]
         for g in rep["golden_rows"]:
             hid = "–" if g.get("resolved") is None else ("pass" if g["resolved"] else "fail")
+            reached = ("yes" + (f" ({g['met_as']})" if g.get("met_as") not in (None, g["expect"]) else "")) if g["met"] else "no"
             out.append(f"| {g['key']} (#{g['issue'] or '–'}) | {g['type']} | {g['expect']} | {'yes' if g['ended'] else 'no'} | "
-                       f"{'yes' if g['met'] else 'no'} | {hid} |")
+                       f"{reached} | {hid} |")
     return "\n".join(out) + "\n"

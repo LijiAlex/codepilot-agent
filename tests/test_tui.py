@@ -258,3 +258,17 @@ async def test_demo_visibility_polling_context_guardrail_block_and_file_count():
         assert blocked and "rm -rf build" in blocked[0] and "delete-files" in blocked[0]
         labels = [str(i.query_one(Label).render()) for i in a.query_one("#approvals", ListView).children]
         assert labels[1].endswith("open PR to main — 2 files") and ">5-file gate" not in labels[1]
+
+
+@pytest.mark.anyio
+async def test_the_log_timer_never_touches_panels_that_are_gone():
+    # flaky in the full suite: the 10 Hz timer redrew Active Task on every tick, and a tick during shutdown found no '#task'
+    a, eng = app()
+    async with a.run_test(size=(140, 40)) as pilot:
+        await pilot.pause()
+        eng.ui.on_event(RunEvent("r1", "message", "coder", "hello", {}))
+        a.flush_logs()
+        a.query_one("#task", Static).remove(); await pilot.pause()
+        a.flush_logs()                                                   # nothing new: must not look for the panel
+        eng.ui.on_event(RunEvent("r1", "message", "coder", "again", {}))
+        a.flush_logs()                                                   # something new, panel gone: skip quietly

@@ -30,7 +30,7 @@ def test_finds_words_secrets_env_tiers_and_emails(tmp_path):
                              ".env": "K=1", "notes.txt": "token ghp_" + "a" * 30}, email="me@zebracorp.example")
     probs = "\n".join(cr.check(r, ["zebracorp", "# comment lines are ignored"]))
     assert "forbidden word 'zebracorp' in src/a.py" in probs and "tracked: .env" in probs
-    assert "possible secret" in probs and "README section missing: ## Setup" in probs
+    assert "possible secret" in probs and "README section missing: ## Try it" in probs
     assert "build tier ('stretch goal')" in probs and "me@zebracorp.example" in probs
 
 
@@ -38,8 +38,8 @@ def test_main_needs_the_outside_word_list(tmp_path, capsys):
     assert cr.main(["--repo", str(tmp_path), "--forbidden", str(tmp_path / "missing.txt")]) == 2
 
 
-def test_readme_template_has_every_section_and_blocks_release_until_filled(tmp_path):
-    tpl = (ROOT / "README.template.md").read_text()
+def test_readme_has_every_section_and_blocks_release_until_filled(tmp_path):
+    tpl = (ROOT / "README.md").read_text()
     r = repo_with(tmp_path, {"README.md": tpl})
     probs = cr.check(r, [])
     assert not [p for p in probs if "section missing" in p or "build tier" in p]

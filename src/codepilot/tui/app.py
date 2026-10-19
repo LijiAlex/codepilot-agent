@@ -12,6 +12,7 @@ from rich.text import Text
 from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
+from textual.css.query import NoMatches
 from textual.containers import Container, Vertical
 from textual.widgets import DataTable, Footer, Label, ListItem, ListView, RichLog, Static
 
@@ -122,6 +123,8 @@ class CodePilotApp(App):
         self.notify(text, timeout=6)
 
     def flush_logs(self) -> None:
+        if not self.buffer:
+            return                                          # nothing new this tick: leave the panels alone
         tokens: dict[str, str] = {}
         while self.buffer:
             e = self.buffer.popleft()
@@ -143,8 +146,7 @@ class CodePilotApp(App):
                 self.refresh_view()
         for agent, text in tokens.items():                  # thoughts arrive as tokens; show them compactly
             self._log("message", agent, text.strip()[:400])
-        if tokens or self.lines:
-            self._render_task()
+        self._render_task()
 
     def _guard_block(self, e) -> None:
         """Make a guard refusal hard to miss: its own red line naming the command and the rule, plus a toast."""
@@ -158,7 +160,10 @@ class CodePilotApp(App):
         plain = f"[{agent}] {text}"
         styled = f"[{KIND_STYLE.get(kind, 'white')}]\\[{escape(agent)}][/] {escape(text)}"
         self.lines.append((plain, styled))
-        self.query_one("#logs", RichLog).write(styled)
+        try:
+            self.query_one("#logs", RichLog).write(styled)
+        except NoMatches:                                   # shutting down: kept in self.lines only
+            pass
 
     # ---- views -------------------------------------------------------------
     def refresh_view(self) -> None:
@@ -224,7 +229,10 @@ class CodePilotApp(App):
 
     def _render_task(self) -> None:
         cur = getattr(self, "_current", None)
-        box = self.query_one("#task", Static)
+        try:
+            box = self.query_one("#task", Static)
+        except NoMatches:                                   # shutting down: the panel is already gone
+            return
         if not cur:
             box.update("idle — waiting for issues")
             return

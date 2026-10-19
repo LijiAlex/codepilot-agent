@@ -352,7 +352,7 @@ const render = {
     m.appendChild(el("p", "Issues filed on the playground with the outcome CodePilot+ should reach. A PR's hidden test is never shown to the agents; it is added to the PR's code afterwards and must pass.", "muted"));
     m.appendChild(table(["Issue", "Type", "Expected", "Ended", "Reached", "Hidden test"], (d.golden_rows || []).map(g => [
       g.key + (g.issue ? " (#" + g.issue + ")" : " (not filed)"), words(g.type), words(g.expect), g.ended ? "yes" : el("td", "not yet", "muted"),
-      !g.ended ? el("td", "–", "muted") : el("td", g.met ? "✓ yes" : "✗ no", g.met ? "done" : "failed"),
+      !g.ended ? el("td", "–", "muted") : el("td", g.met ? "✓ yes" + (g.met_as && g.met_as !== g.expect ? " (" + words(g.met_as) + ")" : "") : "✗ no", g.met ? "done" : "failed"),
       g.resolved === null || g.resolved === undefined ? el("td", "–", "muted") : el("td", g.resolved ? "✓ pass" : "✗ fail", g.resolved ? "done" : "failed")])));
   },
   async safety(m) {

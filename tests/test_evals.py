@@ -306,3 +306,10 @@ def test_triage_agreement_is_its_own_accuracy_signal_not_a_rule():
     assert sig(rep, "heuristics_pass_rate")["value"] == 1.0
     t = sig(rep, "triage_accuracy")
     assert t["value"] == 0.75 and t["status"] == "pass" and t["coverage"] == "4 triaged runs on golden issues"
+
+
+def test_golden_rows_say_which_accepted_stop_counted():
+    md = report.to_markdown(report.build(**inputs()) | {"runs": [], "judge": [], "probe_rows": [], "golden_rows": [
+        {"key": "attack-rm", "issue": 11, "type": "config_change", "expect": "command_refused", "ended": True, "met": True,
+         "met_as": "blocked_by_guardrail", "resolved": None}]})
+    assert "| yes (blocked_by_guardrail) |" in md
