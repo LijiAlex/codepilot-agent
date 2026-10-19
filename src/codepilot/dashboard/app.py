@@ -92,7 +92,8 @@ def create_app(deps: DashboardDeps, token: str, port: int) -> FastAPI:
     @app.get("/api/overview")
     def overview():
         usage = _safe(deps.trace_usage)
-        return data.overview(deps.conn, deps.cost_tracked, None if usage else _trace_costs(), usage)
+        return data.overview(deps.conn, deps.cost_tracked, None if usage else _trace_costs(), usage) \
+            | {"skills": data.overview_skills(deps.conn, deps.repos)}
 
     @app.get("/api/matrix")
     def matrix():
@@ -105,16 +106,26 @@ def create_app(deps: DashboardDeps, token: str, port: int) -> FastAPI:
         d = data.run_detail(deps.conn, deps.runs_dir, run_id)
         if d is None:
             raise HTTPException(404, "no such run")
-        return d
+        usage = _safe(deps.trace_usage)
+        costs = {rid: u.get("cost") for rid, u in usage["runs"].items()} if usage else (_trace_costs() or {})
+        return d | {"cost_usd": costs.get(run_id)}
 
     @app.get("/api/prs")
     def prs():
         out = {}
+        by_pr = (_safe(deps.trace_usage) or {}).get("reviewer_by_pr") or {}
+        run_by_url = {r["pr_url"]: r["id"] for r in deps.conn.execute(
+            "select id, pr_url from runs where pr_url is not null order by created_at")}      # latest run wins
         for name in deps.repos:
             try:
-                out[name] = data.pull_requests(deps.repo_factory(name), deps.reviewer_login)
+                rows = data.pull_requests(deps.repo_factory(name), deps.reviewer_login)
             except Exception as e:                                         # noqa: BLE001 — show, don't crash the page
                 out[name] = {"error": type(e).__name__}
+                continue
+            for p in rows:
+                p["review_usage"] = by_pr.get(f"{name}#{p['number']}")
+                p["run_id"] = run_by_url.get(p["url"])
+            out[name] = rows
         return out
 
     def _pr_action(repo: str, number: int, body: PRAction, action: str):

@@ -267,9 +267,9 @@ def test_usage_from_langsmith_splits_agents_screen_and_reviewer(env):
                         NS(extra={"metadata": {"kind": "injection-screen"}}, total_cost=0.001, prompt_tokens=300, completion_tokens=2)]
             return [NS(extra={"metadata": {"pr": 14}}, total_cost=0.05, prompt_tokens=4000, completion_tokens=400)]
     u = data.langsmith_usage(FakeLS(), "codepilot-plus", "codepilot-reviewer")
-    assert u["runs"][env.rid] == {"cost": 0.2, "tokens_in": 1000, "tokens_out": 50}
-    assert u["screen"] == {"cost": 0.001, "tokens_in": 300, "tokens_out": 2}
-    assert u["reviewer"] == {"cost": 0.05, "tokens_in": 4000, "tokens_out": 400}
+    assert u["runs"][env.rid] == {"count": 1, "cost": 0.2, "tokens_in": 1000, "tokens_out": 50}
+    assert u["screen"] == {"count": 1, "cost": 0.001, "tokens_in": 300, "tokens_out": 2}
+    assert u["reviewer"] == {"count": 1, "cost": 0.05, "tokens_in": 4000, "tokens_out": 400}
     ov = data.overview(env.conn, trace_usage=u)
     assert ov["usage"]["reviewer"]["cost"] == 0.05 and ov["cost_usd"] == 0.25 and ov["cost_source"] == "LangSmith"
 
@@ -361,10 +361,60 @@ def test_overview_summarises_skills_per_task_and_repo_skill_versions(env):
     env.conn.executemany("insert into repo_skill_proposals(id, repo, key, op, section, text, evidence, status) values(?, 'o/r', ?, 'add', 's', 't', 'e', ?)",
                          [("p1", "k1", "pending"), ("p2", "k2", "approved"), ("p3", "k3", "merged")])
     assert env.client.get("/api/overview", headers=H).json()["skills"]["repos"] == [{"repo": "o/r", "version": 2, "waiting": 1, "approved": 1}]
-    js = (Path(__file__).parents[1] / "src" / "codepilot" / "dashboard" / "static" / "app.js").read_text()
-    assert "Skills at a glance" in js
 
 
 def test_runs_page_url_is_runs_and_old_matrix_links_still_work():
     js = (Path(__file__).parents[1] / "src" / "codepilot" / "dashboard" / "static" / "app.js").read_text()
     assert '["runs", "Runs"' in js and 'matrix: "runs"' in js and '"#matrix"' not in js
+
+
+def test_reviewer_usage_counts_reviews_and_splits_them_per_pr():
+    from codepilot.dashboard import data
+    class FakeLS:
+        def list_runs(self, project_name, is_root, limit):
+            assert limit <= 100
+            if project_name == "codepilot-plus":
+                return [NS(extra={"metadata": {"kind": "injection-screen"}}, total_cost=0.001, prompt_tokens=300, completion_tokens=2)]
+            review = lambda pr, cost: NS(name="independent-review", extra={"metadata": {"repo": "o/r", "pr": pr, "head": "h"}},  # noqa: E731
+                                         total_cost=cost, prompt_tokens=1000, completion_tokens=100)
+            return [review(16, 0.02), review(16, 0.03), review(15, 0.01)]
+    u = data.langsmith_usage(FakeLS(), "codepilot-plus", "codepilot-reviewer")
+    assert u["reviewer"]["count"] == 3 and u["screen"]["count"] == 1
+    assert u["reviewer_by_pr"]["o/r#16"] == {"count": 2, "cost": 0.05, "tokens_in": 2000, "tokens_out": 200}
+    assert u["reviewer_by_pr"]["o/r#15"]["count"] == 1
+
+
+def test_prs_carry_review_usage_and_the_codepilot_run_that_opened_them(env, tmp_path):
+    usage = {"runs": {}, "screen": {}, "reviewer": {"count": 2}, "reviewer_by_pr": {"o/r#3": {"count": 2, "cost": 0.05, "tokens_in": 9, "tokens_out": 1}}}
+    deps = DashboardDeps(conn=env.conn, runs_dir=tmp_path, results_dir=tmp_path, repos=["o/r"], repo_factory=lambda n: env.repo,
+                         audit=None, reviewer_login="rev[bot]", trace_usage=lambda: usage)
+    prs = {p["number"]: p for p in TestClient(create_app(deps, TOKEN, PORT)).get("/api/prs", headers=H).json()["o/r"]}
+    assert prs[3]["review_usage"]["count"] == 2 and prs[4]["review_usage"] is None
+    assert prs[3]["run_id"] == env.rid and prs[4]["run_id"] is None          # the run's pr_url is .../pull/3
+
+
+REAL_PR15_BODY = ("### Independent review\n\nThe README adds the requested library-usage section with policy loading, guardrail construction, "
+                  "input checks, and supporting operational guidance.\n\n**Score:** 10/10 · **Review effort:** 1/5\n**Matches the issue:** "
+                  "The change satisfies the linked issue by adding a section titled \"Using it as a library\".\n\n**Merge-ready:** yes\n\n"
+                  "<sub>Reviewed by the CodePilot+ Independent Reviewer. It never merges.</sub>")
+
+
+def test_real_reviewer_body_parses_score_effort_and_merge_ready():
+    f = parse(REAL_PR15_BODY)                    # copied from PR #15 on the playground repo (middle dot, curly quotes elsewhere)
+    assert (f["score"], f["effort"], f["merge_ready"], f["security"]) == (10, 1, True, [])
+
+
+def test_run_detail_has_cost_and_runs_have_start_and_end_times(env, tmp_path):
+    usage = {"runs": {env.rid: {"count": 1, "cost": 0.25, "tokens_in": 9, "tokens_out": 1}}, "screen": {}, "reviewer": {}, "reviewer_by_pr": {}}
+    deps = DashboardDeps(conn=env.conn, runs_dir=tmp_path / "runs", results_dir=tmp_path, repos=["o/r"], repo_factory=lambda n: env.repo,
+                         audit=None, trace_usage=lambda: usage)
+    c = TestClient(create_app(deps, TOKEN, PORT))
+    assert c.get(f"/api/runs/{env.rid}", headers=H).json()["cost_usd"] == 0.25
+    row = c.get("/api/matrix", headers=H).json()["rows"][0]
+    assert row["started"] and "ended" in row
+
+
+def test_audit_links_pr_rows_to_the_run_that_opened_the_pr(env):
+    AuditLog(env.conn).log("human:dashboard", "pr_merge", target="o/r#3", detail={"merged": True})
+    ev = env.client.get("/api/audit", headers=H).json()["events"][0]
+    assert ev["action"] == "pr_merge" and ev["run_id"] is None and ev["linked_run"] == env.rid

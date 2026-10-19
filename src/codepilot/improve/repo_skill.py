@@ -83,7 +83,7 @@ class RepoSkillStore:
             raise ValueError(f"unknown section {section}")
         if op == "add":
             steps.append(Step(f"s{len(steps) + 1}", section, text, provenance))
-            change = f"add {section}: {text[:80]}"
+            change = f"add {section}: {text}"
         elif op in ("correct", "retire"):
             target = next((s for s in steps if s.id == step_id and not s.retired), None)
             if target is None:
@@ -91,7 +91,7 @@ class RepoSkillStore:
             if op == "correct":
                 target.retired = True
                 steps.append(Step(f"s{len(steps) + 1}", target.section, text, provenance))
-                change = f"correct {step_id} → s{len(steps)}: {text[:80]}"
+                change = f"correct {step_id} → s{len(steps)}: {text}"
             else:
                 target.retired = True
                 change = f"retire {step_id}"
@@ -107,5 +107,16 @@ class RepoSkillStore:
         return self._save(repo, v + 1, [Step(**s) for s in json.loads(row[0])], f"rollback to v{version}")
 
     def history(self, repo: str) -> list[dict]:
-        return [{"version": r[0], "created_at": r[1], "change": r[2]} for r in
-                self.conn.execute("select version, created_at, change from repo_skill_versions where repo=? order by version", (repo,))]
+        return [{"version": r[0], "created_at": r[1], "change": _full_change(r[2], r[3])} for r in
+                self.conn.execute("select version, created_at, change, steps_json from repo_skill_versions where repo=? order by version",
+                                  (repo,))]
+
+
+def _full_change(change: str, steps_json: str) -> str:
+    """Versions written before the change text was kept whole cut it at 80 characters. An add / correct appends its step
+    last, so that step holds the full text."""
+    head, sep, text = change.partition(": ")
+    steps = json.loads(steps_json)
+    if sep and head.split(" ")[0] in ("add", "correct") and steps and steps[-1]["text"].startswith(text) and len(text) == 80:
+        return f"{head}: {steps[-1]['text']}"
+    return change

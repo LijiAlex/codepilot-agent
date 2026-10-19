@@ -33,12 +33,14 @@ def langsmith_costs(client: Any, project: str, limit: int = 100) -> dict[str, fl
 
 
 def langsmith_usage(client: Any, project: str, reviewer_project: str | None = None, limit: int = 100) -> dict:
-    """Tokens and cost from LangSmith: per CodePilot+ run (metadata.run_id), the injection screen, and the reviewer."""
+    """Tokens, cost and trace counts from LangSmith: per CodePilot+ run (metadata.run_id), the injection screen, and the
+    reviewer (also per PR, from the review trace's metadata repo + pr)."""
     def add(bucket: dict, r) -> None:
+        bucket["count"] = bucket.get("count", 0) + 1
         bucket["cost"] = round(bucket.get("cost", 0.0) + float(getattr(r, "total_cost", None) or 0), 6)
         bucket["tokens_in"] = bucket.get("tokens_in", 0) + int(getattr(r, "prompt_tokens", None) or 0)
         bucket["tokens_out"] = bucket.get("tokens_out", 0) + int(getattr(r, "completion_tokens", None) or 0)
-    out: dict = {"runs": {}, "screen": {}, "reviewer": {}}
+    out: dict = {"runs": {}, "screen": {}, "reviewer": {}, "reviewer_by_pr": {}}
     for r in client.list_runs(project_name=project, is_root=True, limit=limit):
         meta = (getattr(r, "extra", None) or {}).get("metadata") or {}
         if meta.get("run_id"):
@@ -48,6 +50,9 @@ def langsmith_usage(client: Any, project: str, reviewer_project: str | None = No
     if reviewer_project:
         for r in client.list_runs(project_name=reviewer_project, is_root=True, limit=limit):
             add(out["reviewer"], r)
+            meta = (getattr(r, "extra", None) or {}).get("metadata") or {}
+            if meta.get("repo") and meta.get("pr") is not None:
+                add(out["reviewer_by_pr"].setdefault(f"{meta['repo']}#{meta['pr']}", {}), r)
     return out
 
 
@@ -72,6 +77,24 @@ def overview(conn: sqlite3.Connection, cost_tracked: bool = False, trace_costs: 
             "tokens_in": tok["ti"], "tokens_out": tok["tout"],
             "cost_usd": (round(sum(trace_costs.values()) + extra, 2) if trace_costs else round(tok["c"] or 0, 2) if cost_tracked else None),
             "cost_source": "LangSmith" if trace_costs else ("codepilot.yml prices" if cost_tracked else None)}
+
+
+def overview_skills(conn: sqlite3.Connection, repos: list[str]) -> dict:
+    """Runs and outcomes per task skill, and each repo's current repo-skill version with its waiting / approved changes."""
+    by_task: dict[str, dict] = {}
+    for r in conn.execute("select task_type, state, count(*) n from runs where task_type is not null group by 1, 2 order by 1"):
+        t = by_task.setdefault(r["task_type"], {"task_type": r["task_type"], "runs": 0, "outcomes": {}})
+        t["runs"] += r["n"]
+        t["outcomes"][r["state"]] = r["n"]
+    out_repos = []
+    for repo in repos:
+        try:
+            v = conn.execute("select max(version) from repo_skill_versions where repo=?", (repo,)).fetchone()[0] or 0
+            n = dict(conn.execute("select status, count(*) from repo_skill_proposals where repo=? group by status", (repo,)).fetchall())
+        except sqlite3.OperationalError:               # improvement loop tables not created yet
+            v, n = 0, {}
+        out_repos.append({"repo": repo, "version": v, "waiting": n.get("pending", 0), "approved": n.get("approved", 0)})
+    return {"by_task": list(by_task.values()), "repos": out_repos}
 
 
 def _stage_marks(conn, runs_dir: Path, run: sqlite3.Row) -> dict[str, str]:
@@ -111,6 +134,7 @@ def matrix(conn, runs_dir: Path, trace_costs: dict | None = None) -> dict:
     rows = []
     for r in conn.execute("select * from runs order by created_at desc limit 200"):
         rows.append({"run_id": r["id"], "repo": r["repo"], "issue": r["issue_key"], "title": r["title"], "state": r["state"],
+                     "started": r["created_at"], "ended": r["ended_at"],
                      "reason": r["reason"], "type": r["task_type"], "pr_url": r["pr_url"], "marks": _stage_marks(conn, runs_dir, r),
                      "cost_usd": (trace_costs or {}).get(r["id"])})
     return {"stages": STAGES, "rows": rows}
@@ -214,8 +238,14 @@ def skills(skill_map: dict) -> dict:
     return {"brief_skills": [s.model_dump() for s in skill_map.values()]}
 
 
-def audit(conn, limit: int = 500) -> dict:
-    return {"events": [dict(e) for e in conn.execute("select * from events order by id desc limit ?", (limit,))]}
+def audit(conn, limit: int = 2000) -> dict:
+    """linked_run: for rows logged without a run (PR merge / close from the dashboard), the run that opened that PR."""
+    by_pr = {f"{r['repo']}#{r['pr_number']}": r["id"] for r in
+             conn.execute("select id, repo, pr_number from runs where pr_number is not null order by created_at")}
+    events = [dict(e) for e in conn.execute("select * from events order by id desc limit ?", (limit,))]
+    for e in events:
+        e["linked_run"] = e["run_id"] or by_pr.get(e.get("target") or "")
+    return {"events": events}
 
 
 def parse_review(body: str) -> dict:

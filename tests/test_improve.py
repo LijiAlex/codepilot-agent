@@ -41,6 +41,11 @@ def test_repo_skill_v1_render_and_delta_versions(tmp_path):
     assert st.apply("o/r", "retire", "locations", "", "s3", "run3") == 4
     assert st.rollback("o/r", 2) == 5 and "Tests need PYTHONPATH" in st.render("o/r")[1]
     assert [h["version"] for h in st.history("o/r")] == [1, 2, 3, 4, 5]
+    long = "Guardrail logic lives in `src/guardrail_eval_pipeline/guardrails/` (`deterministic.py`, `llm_judge.py`) and is tested in tests/."
+    v6 = st.apply("o/r", "add", "locations", long, None, "run4")
+    assert st.history("o/r")[-1]["change"] == "add locations: " + long                     # the full text, not cut at 80 characters
+    st.conn.execute("update repo_skill_versions set change=? where repo='o/r' and version=?", ("add locations: " + long[:80], v6))
+    assert st.history("o/r")[-1]["change"] == "add locations: " + long                     # rows written before the fix show in full too
     with pytest.raises(ValueError):
         st.apply("o/r", "correct", "gotchas", "x", "s99", "r")
 
