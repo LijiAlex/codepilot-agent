@@ -47,9 +47,19 @@ def setup_reason(e: Exception) -> str:
     return f"setup: {lines[0][:80]} … {tail[-200:]}"
 
 
+_PY_FLAGS_WITH_VALUE = {"-W", "-X"}       # interpreter options that take the next word, e.g. -W error::DeprecationWarning
+
+
 def _runs_tests(argv: list[str]) -> bool:
     prog = argv[0].rsplit("/", 1)[-1]
-    return prog == "pytest" or (prog in ("python", "python3") and argv[1:3] == ["-m", "pytest"])
+    if prog == "pytest":
+        return True
+    if prog not in ("python", "python3"):
+        return False
+    rest = argv[1:]
+    while rest and rest[0].startswith("-") and rest[0] != "-m":     # skip interpreter flags before -m pytest
+        rest = rest[2:] if rest[0] in _PY_FLAGS_WITH_VALUE else rest[1:]
+    return rest[:2] == ["-m", "pytest"]
 
 
 def _changes_files(data: dict) -> bool:

@@ -322,6 +322,10 @@ def test_running_tests_from_the_shell_does_not_void_verification():
     assert _changes_files({"name": "execute", "args": {"command": "cd sandbox && python gen.py"}})
     assert _changes_files({"name": "edit_file", "args": {"file_path": "/sandbox/a.py"}})
     assert not _changes_files({"name": "write_file", "args": {"file_path": "/shared/pr_draft.json"}})
+    # run 9705eaa62840: interpreter flags before -m pytest are still a test run (they voided a passing verify)
+    assert not _changes_files({"name": "execute", "args": {"command": "cd sandbox && python -W error::DeprecationWarning -m pytest -q -W default"}})
+    assert not _changes_files({"name": "execute", "args": {"command": "python3 -X dev -B -m pytest"}})
+    assert _changes_files({"name": "execute", "args": {"command": "python -W ignore gen.py"}})
 
 
 def test_setup_failure_is_in_the_audit_log_with_the_full_error_tail(env):
