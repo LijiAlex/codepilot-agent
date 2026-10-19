@@ -215,7 +215,7 @@ def test_fork_prs_get_a_review_job_that_never_touches_their_code():
     job = wf["jobs"]["review-fork"]
     cond = job["if"]
     assert "github.event_name == 'pull_request_target'" in cond and "github.event.pull_request.head.repo.full_name != github.repository" in cond
-    assert "additions + github.event.pull_request.deletions <= 2000" in cond                # cost guard against spam PRs
+    assert "github.event.pull_request.additions <= 2000 && github.event.pull_request.deletions <= 2000" in cond   # cost guard
     assert job["permissions"] == {} and "needs" not in job
     text = yaml.safe_dump(job)
     assert "head.sha" not in text and "head.ref" not in text and "download-artifact" not in text and "INSTALL" not in text
@@ -244,3 +244,11 @@ def test_every_action_in_every_job_is_pinned_to_a_commit():
         for s in job["steps"]:
             if "uses" in s:
                 assert re.fullmatch(r"[\w-]+/[\w-]+@[0-9a-f]{40}", s["uses"]), (name, s["uses"])
+
+
+
+def test_workflow_conditions_use_only_github_expression_operators():
+    # live 2026-10-19: `additions + deletions` made GitHub reject the whole file (no arithmetic in expressions)
+    wf = yaml.safe_load((ROOT / "reviewer" / "workflow.yml").read_text())
+    for name, job in wf["jobs"].items():
+        assert not re.search(r"[^=!<>]\s[+\-*/]\s", job["if"]), name
