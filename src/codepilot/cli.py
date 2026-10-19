@@ -90,11 +90,23 @@ def start_dashboard_thread(engine, settings, config_dir: Path, port: int):
     return f"http://127.0.0.1:{port}/#token={token}", thread
 
 
+def enable_stack_dumps(home: Path) -> Path:
+    """`kill -USR1 <pid>` writes every thread's Python stack to <home>/tui-stacks.log (for a frozen TUI)."""
+    import faulthandler
+    import signal
+    home.mkdir(parents=True, exist_ok=True)
+    path = home / "tui-stacks.log"
+    f = open(path, "a")                                     # kept open for the life of the process
+    faulthandler.register(signal.SIGUSR1, file=f, all_threads=True)
+    return path
+
+
 def cmd_tui(args) -> int:
     from codepilot.bootstrap import build_engine
     from codepilot.tui.app import CodePilotApp
     path = _config_path(args.config)
     settings = load_settings(path)
+    enable_stack_dumps(Path(settings.home))
 
     def factory(ui):
         engine = build_engine(settings, ui, path.parent)

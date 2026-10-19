@@ -24,3 +24,15 @@ def test_missing_config_is_explained(tmp_path, monkeypatch):
         assert "codepilot.example.yml" in str(e)
     else:
         raise AssertionError("expected SystemExit")
+
+
+def test_a_frozen_tui_can_be_asked_for_its_python_stacks(tmp_path):
+    # live 2026-10-20: the TUI spun at 100% CPU and the native stack could not show which Python code
+    import os, signal, time
+    from codepilot.cli import enable_stack_dumps
+    log = enable_stack_dumps(tmp_path)
+    os.kill(os.getpid(), signal.SIGUSR1)
+    time.sleep(0.2)
+    text = log.read_text()
+    assert "Current thread" in text or "Thread 0x" in text
+    assert "test_a_frozen_tui_can_be_asked_for_its_python_stacks" in text
