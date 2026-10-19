@@ -186,7 +186,8 @@ const render = {
     m.appendChild(el("h2", "How runs went per repo-skill version"));
     m.appendChild(el("p", "Failed commands per run: shell commands that ran and exited with an error (commands the guard refused are listed on Safety, not here). Tests passed on first try: share of runs whose first verification test run passed — a run can still fail later for another reason.", "muted"));
     m.appendChild(table(["Repo", "Version", "Runs", "Failed commands per run", "Tool calls per run", "Tests passed on first try"],
-      d.trend.map(t => [t.repo, t.version, num(t.runs), t.failed_commands, t.tool_calls, t.first_try_pass === null ? "—" : pct(t.first_try_pass)])));
+      d.trend.map(t => [t.repo, t.version === 0 ? "none (ended before the skill loaded)" : "v" + t.version, num(t.runs),
+        t.failed_commands ?? "—", t.tool_calls ?? "—", t.first_try_pass === null ? "—" : pct(t.first_try_pass)])));
   },
 };
 

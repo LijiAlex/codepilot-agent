@@ -98,7 +98,10 @@ def test_report_drops_forbidden_proposals_and_recurrence_raises_confidence(tmp_p
     assert store.decide(a[0], "approve", "dashboard") == {"status": "approved", "version": 2}
     assert store.decide(a[0], "approve", "dashboard") == {"status": "stale"}
     store.record_trace(t)
-    assert store.trend(["o/r"]) == [{"repo": "o/r", "version": 1, "runs": 1, "failed_commands": 1.0, "tool_calls": 4.0, "first_try_pass": 1.0}]
+    assert store.trend(["o/r"]) == [{"repo": "o/r", "version": 1, "runs": 1, "failed_commands": 1.0, "tool_calls": 4.0, "first_try_pass": 1.0},
+                                    {"repo": "o/r", "version": 2, "runs": 0, "failed_commands": None, "tool_calls": None, "first_try_pass": None}]
+    store.record_trace({**t, "run_id": "early", "repo_skill_version": 0})          # ended in setup, before any skill loaded
+    assert store.trend(["o/r"])[0]["version"] == 0 and store.trend(["o/r"])[0]["runs"] == 1
 
 
 def test_end_to_end_worker_run_then_improver_then_dashboard_approval(tmp_path):

@@ -343,3 +343,8 @@ def test_cli_dashboard_wires_read_only_lessons(tmp_path, monkeypatch):
     monkeypatch.setattr("uvicorn.run", lambda app, host, port, log_level: None)
     cli.main(["--config", str(cfg), "dashboard", "--port", "8799"])
     assert isinstance(seen["deps"].lessons, ReadOnlyLessons)
+
+
+def test_improvements_trend_labels_runs_without_a_skill():
+    js = (Path(__file__).parents[1] / "src" / "codepilot" / "dashboard" / "static" / "app.js").read_text()
+    assert "ended before the skill loaded" in js

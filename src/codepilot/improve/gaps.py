@@ -197,12 +197,19 @@ class ImprovementStore:
         return self.skills.history(repo)
 
     def trend(self, repos: list[str]) -> list[dict]:
+        """Per repo-skill version. Version 0 = runs that ended (e.g. in sandbox setup) before any repo skill was loaded;
+        versions no run has used yet are listed with 0 runs, so every version on the Skills page appears here."""
         out = []
         for repo in repos:
+            rows = {}
             for r in self.conn.execute("select version, count(*) n, avg(failed_commands) fc, avg(tool_calls) tc, avg(first_try_pass) ftp "
-                                       "from trace_analyses where repo=? group by version order by version", (repo,)):
-                out.append({"repo": repo, "version": r["version"], "runs": r["n"], "failed_commands": round(r["fc"], 2),
-                            "tool_calls": round(r["tc"], 1), "first_try_pass": None if r["ftp"] is None else round(r["ftp"], 2)})
+                                       "from trace_analyses where repo=? group by version", (repo,)):
+                rows[r["version"]] = {"repo": repo, "version": r["version"], "runs": r["n"], "failed_commands": round(r["fc"], 2),
+                                      "tool_calls": round(r["tc"], 1), "first_try_pass": None if r["ftp"] is None else round(r["ftp"], 2)}
+            for v in self.skills.history(repo):
+                rows.setdefault(v["version"], {"repo": repo, "version": v["version"], "runs": 0, "failed_commands": None,
+                                               "tool_calls": None, "first_try_pass": None})
+            out.extend(rows[v] for v in sorted(rows))
         return out
 
     def view(self, repos: list[str]) -> dict:
