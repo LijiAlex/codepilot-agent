@@ -66,14 +66,43 @@ def build_report(model, trace: dict, skill_text: str) -> GapReport:
     return report
 
 
+_FILE = re.compile(r"[\w./-]+\.(?:py|toml|ya?ml|json|cfg|ini|md|txt|lock)\b")
+_RUN = re.compile(r"(?m)^\[([^\]\s]+)\]")                 # evidence lines start with "[run_id] "
+VERY_SIMILAR, SIMILAR = 0.80, 0.60         # calibrated on real proposals (2026-10-19): duplicates 0.64-0.85, unrelated 0.66
+
+
+def anchors(text: str) -> set[str]:
+    """Concrete things a proposal is about: file names and the commands the sandbox refuses."""
+    low = text.lower()
+    found = {f.rsplit("/", 1)[-1] for f in _FILE.findall(low)}
+    found |= {c for c in ("python -c", "pip") if re.search(r"(?<![\w-])" + re.escape(c) + r"(?![\w-])", low)}
+    return found
+
+
+def wilson_lower_bound(seen: int, runs: int, z: float = 1.28) -> float:
+    """Lower bound of the Wilson score interval (80%): high only when a change keeps showing up across enough runs."""
+    if runs <= 0 or seen <= 0:
+        return 0.0
+    p = min(seen, runs) / runs
+    centre = p + z * z / (2 * runs)
+    spread = z * ((p * (1 - p) + z * z / (4 * runs)) / runs) ** 0.5
+    return max(0.0, (centre - spread) / (1 + z * z / runs))
+
+
+def _cosine(a, b) -> float:
+    na, nb = sum(x * x for x in a) ** 0.5, sum(y * y for y in b) ** 0.5
+    return sum(x * y for x, y in zip(a, b)) / (na * nb) if na and nb else 0.0
+
+
 def _key(p: Proposal) -> str:
     words = " ".join(sorted(set(re.findall(r"[a-z0-9_./-]{3,}", p.text.lower())))[:200])
     return f"{p.op}|{p.section}|{p.step_id or ''}|{words}"
 
 
 class ImprovementStore:
-    def __init__(self, conn: sqlite3.Connection, skills: RepoSkillStore):
-        self.conn, self.skills = conn, skills
+    def __init__(self, conn: sqlite3.Connection, skills: RepoSkillStore, embed=None):
+        """embed: texts -> vectors (the local MiniLM model). Without it only exact rewordings with shared files merge."""
+        self.conn, self.skills, self.embed = conn, skills, embed
         conn.executescript(SCHEMA)
 
     def record_trace(self, t: dict) -> None:
@@ -88,7 +117,7 @@ class ImprovementStore:
         for p in report.proposals:
             key = _key(p)
             row = self.conn.execute("select id, evidence from repo_skill_proposals where repo=? and key=? and status='pending'",
-                                    (repo, key)).fetchone()
+                                    (repo, key)).fetchone() or self._similar(repo, p)
             if row:
                 self.conn.execute("update repo_skill_proposals set hits=hits+1, last_run=?, evidence=? where id=?",
                                   (run_id, (row["evidence"] + f"\n[{run_id}] {p.evidence}")[-2000:], row["id"]))
@@ -100,6 +129,54 @@ class ImprovementStore:
                                                                    f"[{run_id}] {p.evidence}", run_id, run_id))
                 ids.append(pid)
         return ids
+
+    def _same(self, a_text: str, b_text: str, cos: float | None) -> bool:
+        shared = anchors(a_text) & anchors(b_text)
+        if cos is None:                                   # no embedder: only near-identical wording about the same file
+            wa, wb = set(re.findall(r"[a-z]{4,}", a_text.lower())), set(re.findall(r"[a-z]{4,}", b_text.lower()))
+            return bool(shared) and len(wa & wb) / max(1, len(wa | wb)) >= 0.5
+        return cos >= VERY_SIMILAR or (cos >= SIMILAR and bool(shared))
+
+    def _similar(self, repo: str, p: Proposal):
+        rows = list(self.conn.execute("select id, text, evidence from repo_skill_proposals where repo=? and op=? and section=? "
+                                      "and coalesce(step_id,'')=? and status='pending'", (repo, p.op, p.section, p.step_id or "")))
+        if not rows:
+            return None
+        vecs = self.embed([p.text] + [r["text"] for r in rows]) if self.embed else None
+        for i, r in enumerate(rows):
+            if self._same(p.text, r["text"], _cosine(vecs[0], vecs[i + 1]) if vecs else None):
+                return r
+        return None
+
+    def consolidate(self, repo: str) -> int:
+        """Merge pending proposals that are rewordings of each other (older ones keep the text, gain the evidence)."""
+        rows = list(self.conn.execute("select id, op, section, coalesce(step_id,'') sid, text, evidence from repo_skill_proposals "
+                                      "where repo=? and status='pending' order by rowid", (repo,)))
+        vecs = self.embed([r["text"] for r in rows]) if self.embed and len(rows) > 1 else None
+        merged, gone = 0, set()
+        for i, keep in enumerate(rows):
+            if keep["id"] in gone:
+                continue
+            evidence = keep["evidence"]
+            for j in range(i + 1, len(rows)):
+                other = rows[j]
+                if other["id"] in gone or (other["op"], other["section"], other["sid"]) != (keep["op"], keep["section"], keep["sid"]):
+                    continue
+                if self._same(keep["text"], other["text"], _cosine(vecs[i], vecs[j]) if vecs else None):
+                    evidence = (evidence + "\n" + other["evidence"])[-4000:]
+                    self.conn.execute("update repo_skill_proposals set status='merged' where id=? and status='pending'", (other["id"],))
+                    gone.add(other["id"]); merged += 1
+            if evidence != keep["evidence"]:
+                self.conn.execute("update repo_skill_proposals set evidence=? where id=?", (evidence, keep["id"]))
+        return merged
+
+    def _support(self, repo: str, evidence: str, first_run: str | None) -> tuple[int, int]:
+        """(distinct runs that proposed it, runs analysed on this repo since it first appeared)."""
+        seen = set(_RUN.findall(evidence or ""))
+        row = self.conn.execute("select rowid from runs where id=?", (first_run,)).fetchone() if first_run else None
+        runs = self.conn.execute("select count(*) from runs where repo=? and task_type is not null and rowid>=?",
+                                 (repo, row[0] if row else 0)).fetchone()[0]
+        return len(seen) or 1, max(runs, len(seen) or 1)
 
     def decide(self, proposal_id: str, decision: str, by: str) -> dict:
         row = self.conn.execute("select * from repo_skill_proposals where id=? and status='pending'", (proposal_id,)).fetchone()
@@ -129,8 +206,14 @@ class ImprovementStore:
         return out
 
     def view(self, repos: list[str]) -> dict:
-        props = [dict(r) | {"confidence": round(min(1.0, r["hits"] / 3), 2)} for r in self.conn.execute(
-            "select id, repo, op, section, text, step_id, evidence, hits from repo_skill_proposals where status='pending' order by hits desc")]
+        for repo in {r["repo"] for r in self.conn.execute("select distinct repo from repo_skill_proposals where status='pending'")}:
+            self.consolidate(repo)
+        props = []
+        for r in self.conn.execute("select id, repo, op, section, text, step_id, evidence, hits, first_run from repo_skill_proposals "
+                                   "where status='pending'"):
+            seen, runs = self._support(r["repo"], r["evidence"], r["first_run"])
+            props.append(dict(r) | {"seen": seen, "runs": runs, "confidence": round(wilson_lower_bound(seen, runs), 2)})
+        props.sort(key=lambda p: (-p["confidence"], -p["seen"]))
         for p in props:
             p["change"] = f"{p['op']} {p['section']}" + (f" {p['step_id']}" if p["step_id"] else "") + f": {p['text']}"
         reports = [dict(r) for r in self.conn.execute("select run_id, repo, report_json, created_at from skill_gap_reports order by created_at desc limit 20")]
@@ -155,3 +238,15 @@ class Improver:
         ids = self.store.record_report(trace["repo"], run_id, report)
         self.audit.log("improver", "skill_gap_report", run_id=run_id, detail={"proposals": ids})
         return {"trace": trace, "report": report.model_dump(), "proposals": ids}
+
+
+def lazy_embedder():
+    """The local MiniLM embedder, loaded on first use (keeps startup fast and offline until a proposal needs it)."""
+    holder = {}
+
+    def embed(texts):
+        if "f" not in holder:
+            from codepilot.memory.semantic import default_embedder
+            holder["f"] = default_embedder()
+        return holder["f"](texts)
+    return embed

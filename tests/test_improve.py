@@ -92,7 +92,9 @@ def test_report_drops_forbidden_proposals_and_recurrence_raises_confidence(tmp_p
     b = store.record_report("o/r", "run2", rep)
     assert a == b
     view = store.view(["o/r"])
-    assert view["proposals"][0]["hits"] == 2 and view["proposals"][0]["confidence"] == 0.67
+    from codepilot.improve.gaps import wilson_lower_bound
+    p0 = view["proposals"][0]
+    assert p0["seen"] == 2 and p0["confidence"] == round(wilson_lower_bound(2, p0["runs"]), 2)   # recurrence raises confidence
     assert store.decide(a[0], "approve", "dashboard") == {"status": "approved", "version": 2}
     assert store.decide(a[0], "approve", "dashboard") == {"status": "stale"}
     store.record_trace(t)
@@ -138,3 +140,45 @@ def test_a_double_click_applies_an_approved_change_once(tmp_path):
     skills.apply = apply
     assert store.decide(pid, "approve", "dashboard")["status"] == "approved"
     assert len(applied) == 1 and nested == [{"status": "stale"}]
+
+
+# --- confidence: merge reworded duplicates, Wilson lower bound over runs since first seen -----------------------------
+def _store(tmp_path, vectors):
+    conn = connect(tmp_path / "cp.db")
+    skills = RepoSkillStore(conn); skills.ensure_v1(CFG, FILES)
+    return conn, ImprovementStore(conn, skills, embed=lambda texts: [vectors[t] for t in texts])
+
+
+def _claim_run(conn, rid):
+    conn.execute("insert into runs(id, repo, kind, issue_key, title, state, task_type) values(?,?,?,?,?,?,?)",
+                 (rid, "o/r", "issue", f"#{rid}", "t", "FAILED", "bug_fix"))
+
+
+G1 = "Inline `python -c` commands are refused; read pyproject.toml with the file tool."
+G2 = "For version checks do not run `python -c \"import pydantic\"` or `pip show`; read pyproject.toml instead."
+L1 = "`src/pkg/heuristics.py` holds heuristic checks; tests in `tests/test_evaluation.py`."
+L2 = "Adapters live in `src/pkg/adapters/` (`medibot.py`); tests in `tests/test_adapters.py`."
+
+
+def test_reworded_duplicates_merge_but_unrelated_hints_with_similar_shape_do_not(tmp_path):
+    conn, store = _store(tmp_path, {G1: [1, 0, 0], G2: [0.7, 0.71, 0], L1: [0, 0, 1], L2: [0.66, 0, 0.75]})
+    for rid, (sec, text) in zip(["r1", "r2", "r3", "r4"], [("gotchas", G1), ("gotchas", G2), ("locations", L1), ("locations", L2)]):
+        _claim_run(conn, rid)
+        store.record_report("o/r", rid, GapReport(summary="s", proposals=[Proposal(op="add", section=sec, text=text, evidence="e")]))
+    props = {p["text"]: p for p in store.view(["o/r"])["proposals"]}
+    assert G1 in props and G2 not in props and props[G1]["seen"] == 2          # cos 0.70 + shared `python -c` / pyproject.toml
+    assert L1 in props and L2 in props                                          # cos ~0.66 but no shared file: kept apart
+
+
+def test_confidence_is_the_wilson_lower_bound_of_runs_that_saw_it(tmp_path):
+    conn, store = _store(tmp_path, {G1: [1, 0, 0]})
+    for rid in ["r1", "r2", "r3", "r4", "r5"]:
+        _claim_run(conn, rid)
+    for rid in ["r1", "r2", "r3"]:
+        store.record_report("o/r", rid, GapReport(summary="s", proposals=[Proposal(op="add", section="gotchas", text=G1, evidence="e")]))
+    store.record_report("o/r", "r3", GapReport(summary="s", proposals=[Proposal(op="add", section="gotchas", text=G1, evidence="e")]))
+    p = store.view(["o/r"])["proposals"][0]
+    assert (p["seen"], p["runs"]) == (3, 5)                                     # the same run twice counts once
+    from codepilot.improve.gaps import wilson_lower_bound
+    assert p["confidence"] == round(wilson_lower_bound(3, 5), 2)
+    assert wilson_lower_bound(1, 1) < wilson_lower_bound(3, 3) < 1 and wilson_lower_bound(0, 4) == 0

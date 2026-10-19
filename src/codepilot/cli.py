@@ -141,7 +141,7 @@ def cmd_dashboard(args) -> int:
     from codepilot.dashboard.app import DashboardDeps, create_app
     from codepilot.db import connect
     from codepilot.gh.auth import TokenProvider
-    from codepilot.improve.gaps import ImprovementStore
+    from codepilot.improve.gaps import ImprovementStore, lazy_embedder
     from codepilot.improve.repo_skill import RepoSkillStore
     from codepilot.memory.episodic import EpisodicMemory
     from codepilot.skills import load_skills
@@ -159,7 +159,7 @@ def cmd_dashboard(args) -> int:
                          repo_factory=lambda n: tokens(n).repo(), audit=AuditLog(conn), reviewer_login=s.reviewer_login,
                          # standalone: no ChromaDB (one process per Chroma folder); lessons show with `codepilot --dashboard PORT`
                          lessons=None, episodic=EpisodicMemory(home / "store.db"),
-                         skills=load_skills(), improvements=ImprovementStore(conn, RepoSkillStore(conn)))
+                         skills=load_skills(), improvements=ImprovementStore(conn, RepoSkillStore(conn), embed=lazy_embedder()))
     token = dashboard_token(home)
     print(f"CodePilot+ dashboard: http://127.0.0.1:{args.port}/#token={token}  (this link is the password; Ctrl-C to stop)")
     uvicorn.run(create_app(deps, token, args.port), host="127.0.0.1", port=args.port, log_level="warning")

@@ -16,7 +16,7 @@ from codepilot.db import connect
 from codepilot.engine import Engine, UiCallbacks
 from codepilot.gh.auth import TokenProvider
 from codepilot.handoffs import HandoffStore
-from codepilot.improve.gaps import ImprovementStore, Improver
+from codepilot.improve.gaps import ImprovementStore, Improver, lazy_embedder
 from codepilot.improve.repo_skill import RepoSkillStore
 from codepilot.memory.episodic import EpisodicMemory
 from codepilot.memory.semantic import FileIndex, LessonStore, default_embedder
@@ -97,5 +97,5 @@ def build_engine(settings: Settings, ui: UiCallbacks, config_dir: Path = Path(".
                                       repo_factory=repo_factory, lessons=lessons, on_notice=ui.on_notice, runs_dir=home / "runs"))
     by_name = {r.full_name: r for r in settings.repos}
     cs = ContinuationServices(publish=ps, repo_config=by_name.__getitem__, lessons=lessons, cancel_run=worker.cancel)
-    improver = Improver(conn, home / "runs", ImprovementStore(conn, skill_store), solver, audit)
+    improver = Improver(conn, home / "runs", ImprovementStore(conn, skill_store, embed=lazy_embedder()), solver, audit)
     return Engine(settings, worker, poller, watcher, cs, episodic, ui, selfcheck=run_selfcheck, improver=improver)

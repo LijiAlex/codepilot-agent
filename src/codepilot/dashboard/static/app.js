@@ -160,12 +160,12 @@ const render = {
   async improvements(m) {
     const d = await api("improvements");
     m.appendChild(el("h2", "Proposed skill changes waiting for a decision"));
-    m.appendChild(el("p", "Confidence rises each time later runs propose the same change (3 sightings = 100%). Nothing changes until you approve.", "muted"));
-    m.appendChild(table(["Repo", "Change", "Evidence", "Confidence", "Decide"], d.proposals.map(p => {
+    m.appendChild(el("p", "Seen: how many runs proposed this change (rewordings of the same change are merged), out of the runs on that repository since it first appeared. Confidence is the lower bound of the Wilson score interval: it rises only when a change keeps coming back across enough runs. Nothing changes until you approve.", "muted"));
+    m.appendChild(table(["Repo", "Change", "Evidence", "Seen", "Confidence", "Decide"], d.proposals.map(p => {
       const c = el("td"); ["approve", "reject"].forEach(dec => { const b = el("button", dec, dec === "reject" ? "danger" : ""); b.addEventListener("click", async () => {
         if (!confirm(dec[0].toUpperCase() + dec.slice(1) + " this change to " + p.repo + "'s repo skill?\n\n" + p.change)) return;
         try { await api("improvements/" + p.id + "/" + dec, { confirm: true }); show("improvements"); } catch (e) { alert(e.message); } }); c.appendChild(b); });
-      return [p.repo, td(textWithCode(p.change)), td(textWithCode(p.evidence)), pct(p.confidence), c]; })));
+      return [p.repo, td(textWithCode(p.change)), td(textWithCode(p.evidence)), p.seen === undefined ? "" : p.seen + " of " + p.runs + " runs", pct(p.confidence), c]; })));
     m.appendChild(el("h2", "How runs went per repo-skill version"));
     m.appendChild(el("p", "Failed commands per run: shell commands that ran and exited with an error (commands the guard refused are listed on Safety, not here). Tests passed on first try: share of runs whose first verification test run passed — a run can still fail later for another reason.", "muted"));
     m.appendChild(table(["Repo", "Version", "Runs", "Failed commands per run", "Tool calls per run", "Tests passed on first try"],
