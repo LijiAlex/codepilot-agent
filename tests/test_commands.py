@@ -77,3 +77,20 @@ def test_an_approved_part_is_allowed_in_any_combination_but_nothing_else():
     assert classify_command("make test", approved).kind == "unknown"                 # only what was approved
     assert classify_command("make lint && rm -rf build", approved).kind == "blocked"  # approval never unblocks
     assert classify_command("cd sandbox && make lint").kind == "unknown"             # nothing approved: still asks
+
+
+def test_an_output_join_does_not_change_what_was_approved():
+    # live 2026-10-20, issue #9: `make lint 2>&1 | tail` was approved as "make lint '2>&1'", so plain `make lint` asked again
+    from codepilot.safety.commands import unknown_parts
+    approved = unknown_parts("cd sandbox && make lint 2>&1 | tail -n 20")
+    assert approved == frozenset({"make lint"})
+    assert classify_command("cd sandbox && cat Makefile && make lint; echo done", approved).kind == "allowed"
+    assert classify_command("make lint 2>&1", frozenset({"make lint"})).kind == "allowed"
+    old = unknown_parts("make lint '2>&1'")                       # approvals already stored the old way still work
+    assert classify_command("make lint", old).kind == "allowed"
+
+
+def test_read_only_inspection_commands_do_not_need_a_person():
+    # live 2026-10-20, issue #9: the agent paused to ask about `od -c Makefile` and `git check-ignore -v Makefile`
+    assert classify_command("cd sandbox && od -c Makefile").kind == "allowed"
+    assert classify_command("git check-ignore -v Makefile").kind == "allowed"

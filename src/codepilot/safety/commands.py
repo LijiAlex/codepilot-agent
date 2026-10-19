@@ -13,8 +13,9 @@ from dataclasses import dataclass
 from typing import Literal
 
 ALLOWED = {"python", "python3", "pytest", "ls", "cat", "head", "tail", "grep", "find", "wc", "echo",
-           "pwd", "true", "sort", "uniq", "diff", "cd", "git", "tree"}
-GIT_ALLOWED = {"status", "diff", "log", "show", "add", "apply", "rev-parse", "ls-files", "branch", "stash", "restore", "checkout"}
+           "pwd", "true", "sort", "uniq", "diff", "cd", "git", "tree", "od"}
+GIT_ALLOWED = {"status", "diff", "log", "show", "add", "apply", "rev-parse", "ls-files", "branch", "stash", "restore", "checkout",
+               "check-ignore"}
 GIT_BLOCKED = {"push", "remote", "fetch", "pull", "clone", "config", "submodule"}
 BLOCKED = {"curl", "wget", "ssh", "scp", "sftp", "nc", "sudo", "su", "claude", "gh", "pip", "pip3", "npm", "npx",
            "yarn", "pnpm", "brew", "apt", "apt-get", "chmod", "chown", "dd", "mkfs", "kill", "pkill", "env", "printenv", "export",
@@ -86,9 +87,12 @@ def _segment(seg: str) -> Classification:
     return Classification("unknown", f"{prog} is not on the allowed or blocked list")
 
 
+STREAM_JOIN = re.compile(r"^\d?>&\d$")               # `2>&1` changes where output goes, not what runs
+
+
 def _norm(seg: str) -> str:
     try:
-        return shlex.join(shlex.split(seg))
+        return shlex.join([a for a in shlex.split(seg) if not STREAM_JOIN.match(a)])
     except ValueError:
         return seg.strip()
 
