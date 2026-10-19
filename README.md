@@ -128,6 +128,7 @@ Run the tests: `uv run pytest` (FILL: test count).
 - **Steadier triage.** Remember an issue's first classification, or classify twice and take the majority, so retries are consistent.
 - **Block outbound network in the sandbox** with a paid sandbox tier or an allow-list.
 - **Spending limits in dollars** per run and per day (runs are already bounded by model calls, tool calls and time).
+- **An autonomous mode.** Open pull requests without waiting for approval and let the independent reviewer and the merge button be the human checkpoint. The trade-off: agent-written code and text would appear on GitHub before anyone has read it, and a bad run would open pull requests someone has to close. (The assignment requires approval before opening a pull request to `main`, so this version always asks.)
 - **Run tests for fork pull requests** in a separate sandbox with no secrets, so the reviewer can score them fully.
 
 ## For reviewers: the assignment brief
