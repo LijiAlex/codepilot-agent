@@ -255,7 +255,18 @@ def parse_review(body: str) -> dict:
     matches = re.search(r"\*\*Matches the issue:\*\*\s*(.+)", b)
     sec = re.search(r"\*\*Security concerns:\*\*\n((?:- .+\n?)+)", b)
     ready = re.search(r"\*\*Merge-ready:\*\*\s*(yes|no)(?:\s*—\s*(.+))?", b)
+    cap = re.search(r"\*\*Review effort:\*\*\s*\d+/5 \(([^)\n]+)\)", b)
+    rub = re.search(r"\*\*Rubric:\*\*\s*(.+)", b)
+    rubric = {m.group(1).strip(): int(m.group(2)) for m in re.finditer(r"([a-z][a-z ]*?) (\d)/2", rub.group(1))} if rub else {}
+    reasons = {}
+    if rub:                                            # "- <criterion>: <reason>" lines right after the rubric line
+        for line in b[rub.end():].lstrip("\n").splitlines():
+            m = re.match(r"- ([a-z][a-z ]*): (.+)", line)
+            if not m or m.group(1) not in rubric:
+                break
+            reasons[m.group(1)] = m.group(2).strip()
     return {"score": num(r"\*\*Score:\*\*\s*(\d+)/10"), "effort": num(r"\*\*Review effort:\*\*\s*(\d+)/5"),
+            "cap": cap.group(1).strip() if cap else "", "rubric": rubric, "rubric_reasons": reasons,
             "matches": matches.group(1).strip() if matches else "",
             "security": [x[2:].strip() for x in sec.group(1).strip().splitlines()] if sec else [],
             "merge_ready": (ready.group(1) == "yes") if ready else None,
