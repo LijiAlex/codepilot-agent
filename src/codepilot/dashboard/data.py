@@ -175,6 +175,35 @@ def context(conn, runs_dir: Path, budget: int = 4000) -> dict:
     return {"runs": out, "budget": budget}
 
 
+class ReadOnlyLessons:
+    """Lessons for the standalone dashboard, read straight from ChromaDB's SQLite file in read-only mode.
+    Opening a second Chroma client on the folder the TUI uses is unsafe (one process per Chroma folder), but a
+    read-only SQLite connection is fine: SQLite's own locking keeps readers and the TUI's writes consistent.
+    Chroma's tables are internal, so any schema surprise shows as "no lessons" rather than an error."""
+
+    def __init__(self, chroma_dir: Path):
+        self.db = Path(chroma_dir) / "chroma.sqlite3"
+
+    def all(self, repo: str) -> list[dict]:
+        if not self.db.exists():
+            return []
+        try:
+            conn = sqlite3.connect(f"file:{self.db}?mode=ro", uri=True)
+            try:
+                rows = conn.execute(
+                    "select e.embedding_id, m.key, coalesce(m.string_value, m.int_value, m.float_value) "
+                    "from embeddings e join segments s on s.id=e.segment_id join collections c on c.id=s.collection "
+                    "join embedding_metadata m on m.id=e.id where c.name='lessons'").fetchall()
+            finally:
+                conn.close()
+        except sqlite3.Error:
+            return []
+        by_id: dict[str, dict] = {}
+        for lid, key, val in rows:
+            by_id.setdefault(lid, {"id": lid})["text" if key == "chroma:document" else key] = val
+        return sorted((x for x in by_id.values() if x.get("repo") == repo), key=lambda x: x.get("ts") or 0)
+
+
 def memory(lessons: Any, episodic: Any, repos: list[str]) -> dict:
     return {"lessons": {repo: lessons.all(repo) for repo in repos} if lessons is not None else {},
             "sessions": episodic.last_sessions(20) if episodic is not None else [],

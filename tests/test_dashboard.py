@@ -320,3 +320,26 @@ def test_tested_mark_says_tests_passed_but_verification_was_voided(env, tmp_path
     assert rows[never]["marks"]["Tested"] == "failed"
     js = (Path(__file__).parents[1] / "src" / "codepilot" / "dashboard" / "static" / "app.js").read_text()
     assert "voided:" in js and "not re-tested" in js
+
+
+def test_standalone_dashboard_lists_lessons_read_only_from_chromas_file(tmp_path):
+    from codepilot.dashboard.data import ReadOnlyLessons
+    from codepilot.memory.semantic import LessonStore
+    store = LessonStore(tmp_path / "chroma", lambda texts: [[float(len(t)), 1.0] for t in texts])
+    store.add("o/r", "bug_fix", "run the slug tests first", "merged", "abc123")
+    store.add("o/x", "bug_fix", "other repo", "failure", "def456")
+    got = ReadOnlyLessons(tmp_path / "chroma").all("o/r")
+    assert [(l["text"], l["source"], l["task_type"], l["run_id"]) for l in got] == [("run the slug tests first", "merged", "bug_fix", "abc123")]
+    assert ReadOnlyLessons(tmp_path / "missing").all("o/r") == []          # no Chroma folder yet: empty, not an error
+
+
+def test_cli_dashboard_wires_read_only_lessons(tmp_path, monkeypatch):
+    import codepilot.cli as cli
+    from codepilot.dashboard.data import ReadOnlyLessons
+    cfg = tmp_path / "codepilot.yml"
+    cfg.write_text(f"repos:\n  - owner: o\n    name: r\nhome: {tmp_path / 'home'}\n")
+    seen = {}
+    monkeypatch.setattr("codepilot.dashboard.app.create_app", lambda deps, token, port: seen.setdefault("deps", deps))
+    monkeypatch.setattr("uvicorn.run", lambda app, host, port, log_level: None)
+    cli.main(["--config", str(cfg), "dashboard", "--port", "8799"])
+    assert isinstance(seen["deps"].lessons, ReadOnlyLessons)

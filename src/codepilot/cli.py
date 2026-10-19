@@ -155,6 +155,7 @@ def cmd_dashboard(args) -> int:
 
     from codepilot.audit import AuditLog
     from codepilot.dashboard.app import DashboardDeps, create_app
+    from codepilot.dashboard.data import ReadOnlyLessons
     from codepilot.db import connect
     from codepilot.gh.auth import TokenProvider
     from codepilot.improve.gaps import ImprovementStore, lazy_embedder
@@ -173,8 +174,8 @@ def cmd_dashboard(args) -> int:
 
     deps = DashboardDeps(trace_usage=trace_usage_source(s.langsmith_project), trace_costs=trace_cost_source(s.langsmith_project), map_budget=s.repo_map_budget_tokens, cost_tracked=s.price_in_per_mtok is not None and s.price_out_per_mtok is not None, conn=conn, runs_dir=home / "runs", results_dir=path.parent / "results", repos=[r.full_name for r in s.repos],
                          repo_factory=lambda n: tokens(n).repo(), audit=AuditLog(conn), reviewer_login=s.reviewer_login,
-                         # standalone: no ChromaDB (one process per Chroma folder); lessons show with `codepilot --dashboard PORT`
-                         lessons=None, episodic=EpisodicMemory(home / "store.db"),
+                         # standalone: no Chroma client (one process per Chroma folder); lessons are read from its SQLite file read-only
+                         lessons=ReadOnlyLessons(home / "chroma"), episodic=EpisodicMemory(home / "store.db"),
                          skills=load_skills(), improvements=ImprovementStore(conn, RepoSkillStore(conn), embed=lazy_embedder()))
     token = dashboard_token(home)
     print(f"CodePilot+ dashboard: http://127.0.0.1:{args.port}/#token={token}  (this link is the password; Ctrl-C to stop)")
