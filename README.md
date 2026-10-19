@@ -96,6 +96,19 @@ FILL: `![LangSmith trace](docs/langsmith.png)` — one run's trace (Orchestrator
 - If `main` changed 300 or more files since the run started, GitHub's compare API cannot list them all, so publishing is refused as a possible conflict.
 - Claude Sonnet 5.5 accepts only the default sampling temperature, so runs are not deterministic.
 
+## Future improvements
+
+Ideas that came up while building and testing, deliberately left out of this version:
+
+- **Promote lessons from repo skills to task skills.** Task skills (the five playbooks) stay generic and fixed; everything repository-specific lives in each repo skill. A safe next step: when the same gotcha has been approved in the repo skills of at least two repositories (for example "inline `python -c` is refused — read the file instead"), propose it as an addition to the matching task skill. Additions only — a learned change may never remove or soften a "Must not" rule or the workflow steps — with its own approval and versions.
+- **Current repo skill view.** The Skills tab lists each version's change; it could also show the full text the agents read for any version, with the steps each version added or retired, and its size against the 1,500-token budget.
+- **Smarter merging of skill proposals.** Reworded proposals are merged by meaning (local embeddings) plus a shared file or command; an extra model check on borderline pairs (merge / keep both) would cut the rare wrong merge.
+- **Tests for fork pull requests.** Fork PRs are reviewed from the diff only and their code is never run, so they are never marked merge-ready automatically. Running their tests in a separate throw-away sandbox with no secrets would let the reviewer score them fully.
+- **Steadier triage.** The same issue can be classified differently on different runs (for example bug fix one time, feature addition the next). Remembering the first classification per issue, or asking twice and taking the majority, would make retries consistent.
+- **Blocking outbound network in the sandbox.** The shell guard refuses network tools, but the remote box itself can reach the internet on the current plan; a paid sandbox tier or an egress allow-list would close that.
+- **Cost limits per run in dollars.** Runs are bounded by model calls, tool calls and minutes; LangSmith already prices every call, so a dollar ceiling per run (and per day) is a small step.
+- **Pull request page extras.** CI status from GitHub, sorting, and a direct "re-review" button that adds the `codepilot-review-pending` label.
+
 ## Brief vs CodePilot+
 
 | Brief | CodePilot+ | Why |
