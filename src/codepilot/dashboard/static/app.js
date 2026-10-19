@@ -4,14 +4,17 @@ const PAGES = [
   ["overview", "Overview", "Totals across every run CodePilot+ has done."],
   ["runs", "Runs", "Every run and the stages it reached. Click a run ID for its diff, log and analysis."],
   ["prs", "Pull requests", "Open pull requests with the independent review. Merge needs a current review that says merge-ready."],
-  ["safety", "Safety", "What the guardrails refused or held back, and the measured injection screen."],
   ["evaluation", "Evaluation", "One verdict from rule checks on every run, the independent reviewer as judge (tested with probes), golden issues with hidden tests, and the injection screen."],
-  ["context", "Context", "How much context runs were given: the repo map per repository against its budget, and the lessons each run recalled."],
-  ["memory", "Memory", "Lessons learned from past work, and a summary of each recent session."],
-  ["skills", "Skills", "The five task skills and each repository's own skill (its versions)."],
+  ["safety", "Safety", "What the guardrails refused or held back, and the measured injection screen."],
   ["audit", "Audit log", "Every action, by whom, in order."],
   ["improvements", "Improvements", "Proposed changes to a repository's skill, waiting for a person, and how runs went per skill version."],
+  ["memory", "Memory", "Lessons learned from past work, and a summary of each recent session."],
+  ["skills", "Skills", "The five task skills and each repository's own skill (its versions)."],
+  ["context", "Context", "How much context runs were given: the repo map per repository against its budget, and the lessons each run recalled."],
 ];
+// nav groups: what the agent did, whether its work can be trusted, and what it learned (and with what context)
+const GROUPS = [["", ["overview"]], ["Work", ["runs", "prs"]], ["Trust", ["evaluation", "safety", "audit"]],
+  ["Learning", ["improvements", "memory", "skills", "context"]]];
 const SIGNAL_NAMES = { heuristics_pass_rate: "Rule checks passed", expected_outcome_rate: "Golden issues: expected outcome",
   triage_accuracy: "Triage accuracy", hidden_tests_passed: "Hidden tests passed", judge_mean: "Judge score (mean)",
   judge_probes: "Judge probes right", injection_blocked: "Attacks blocked", false_alarms: "False alarms" };
@@ -532,7 +535,12 @@ function autoRefreshDue() {             // never pull the page away from a perso
 
 document.addEventListener("DOMContentLoaded", () => {
   const nav = document.getElementById("nav");
-  PAGES.forEach(([p, label]) => { const b = el("button", label); b.dataset.page = p; b.addEventListener("click", () => { location.hash = p; }); nav.appendChild(b); });
+  GROUPS.forEach(([name, pages]) => {
+    const g = el("div", null, "nav-group");
+    if (name) { g.appendChild(el("span", name, "nav-label")); g.setAttribute("role", "group"); g.setAttribute("aria-label", name); }
+    pages.forEach(p => { const b = el("button", PAGES.find(x => x[0] === p)[1]); b.dataset.page = p; b.addEventListener("click", () => { location.hash = p; }); g.appendChild(b); });
+    nav.appendChild(g);
+  });
   const st = document.getElementById("status");
   st.appendChild(el("span", "Times are in your local time · ", "muted"));
   st.appendChild(el("span", "", "muted")).id = "refreshed";

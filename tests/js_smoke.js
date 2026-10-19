@@ -30,7 +30,7 @@ function node(tag) {
   });
 }
 const doc = { createElement: node, createTextNode: t => Object.assign(new Node(), { textContent: String(t) }), getElementById: () => node("div"),
-  querySelectorAll: () => [], addEventListener() {}, body: node("body") };
+  querySelectorAll: () => [], addEventListener(ev, fn) { if (ev === "DOMContentLoaded") doc.__ready = fn; }, body: node("body") };
 const ctx = { document: doc, Node, console, JSON, Math, Number, String, Object, Array, Set, Map, Date, Promise, URLSearchParams,
   RegExp, Error, encodeURIComponent, isNaN, parseInt, parseFloat, setTimeout, clearTimeout, setInterval: () => 0, clearInterval() {},
   sessionStorage: { getItem: () => "t", setItem() {} }, localStorage: { getItem: () => null, setItem() {} },
@@ -40,12 +40,15 @@ const ctx = { document: doc, Node, console, JSON, Math, Number, String, Object, 
     const body = page.startsWith("runs/") ? responses["run"] : responses[page];
     return { ok: true, status: 200, json: async () => body || {} }; } };
 vm.createContext(ctx);
-vm.runInContext(fs.readFileSync(appJs, "utf8") + "\nthis.__render = render; this.__showRun = showRun;", ctx);
+vm.runInContext(fs.readFileSync(appJs, "utf8") + "\nthis.__render = render; this.__showRun = showRun; this.__groups = GROUPS; this.__pages = PAGES;", ctx);
 (async () => {
   const errors = {};
   for (const page of Object.keys(ctx.__render)) {
     try { await ctx.__render[page](node("main")); } catch (e) { errors[page] = String(e && e.stack || e).split("\n").slice(0, 3).join(" | "); }
   }
   try { await ctx.__showRun("x"); } catch (e) { errors.run = String(e); }
+  try { doc.__ready(); } catch (e) { errors.nav = String(e); }        // builds the grouped tab bar
+  const grouped = ctx.__groups.flatMap(g => g[1]).sort().join(), all = ctx.__pages.map(p => p[0]).sort().join();
+  if (grouped !== all) errors.groups = "every page must be in exactly one nav group: " + grouped + " vs " + all;
   console.log(JSON.stringify(errors));
 })();
