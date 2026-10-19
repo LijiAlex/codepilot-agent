@@ -272,3 +272,30 @@ def test_usage_from_langsmith_splits_agents_screen_and_reviewer(env):
     assert u["reviewer"] == {"cost": 0.05, "tokens_in": 4000, "tokens_out": 400}
     ov = data.overview(env.conn, trace_usage=u)
     assert ov["usage"]["reviewer"]["cost"] == 0.05 and ov["cost_usd"] == 0.25 and ov["cost_source"] == "LangSmith"
+
+
+REVIEW_BODY = ("### Independent review\n\nLooks right.\n\n**Score:** 6/10 · **Review effort:** 3/5\n**Matches the issue:** Mostly.\n\n"
+               "**Security concerns:**\n- reads a token from env\n\n**Merge-ready:** no — score 6 < 7; needs a human approval\n\n"
+               "> Tests not run: code from a fork is never executed by this reviewer, so this PR is never marked merge-ready automatically.")
+
+
+def test_review_body_is_split_into_fields():
+    from codepilot.dashboard.data import parse_review
+    f = parse_review(REVIEW_BODY)
+    assert (f["score"], f["effort"], f["merge_ready"]) == (6, 3, False)
+    assert f["matches"] == "Mostly." and f["security"] == ["reads a token from env"] and f["tests_not_run"] is True
+    assert f["why_not"] == "score 6 < 7; needs a human approval"
+
+
+def test_prs_needing_a_person_are_flagged_with_reasons():
+    from codepilot.dashboard.data import attention
+    fork = {"from_fork": True, "codepilot": False, "review": {"current": True, "fields": parse(REVIEW_BODY)}}
+    assert {"from a fork", "security concerns", "low score (6/10)"} <= set(attention(fork))
+    assert "not reviewed yet" in attention({"from_fork": False, "codepilot": True, "review": None})
+    clean = {"from_fork": False, "codepilot": True, "review": {"current": True, "fields": {"score": 10, "security": [], "merge_ready": True}}}
+    assert attention(clean) == []
+
+
+def parse(body):
+    from codepilot.dashboard.data import parse_review
+    return parse_review(body)

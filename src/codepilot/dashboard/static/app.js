@@ -100,10 +100,14 @@ const render = {
   },
   async prs(m) {
     const d = await api("prs");
-    for (const [repo, prs] of Object.entries(d)) {
+    for (const [repo, prsIn] of Object.entries(d)) {
       m.appendChild(el("h2", repo));
-      if (prs.error) { m.appendChild(el("p", "Could not load: " + prs.error, "muted")); continue; }
-      m.appendChild(table(["PR", "Actions", "Independent review", "Labels", "Author"], prs.map(p => {
+      if (prsIn.error) { m.appendChild(el("p", "Could not load: " + prsIn.error, "muted")); continue; }
+      const prs = [...prsIn].sort((a, b) => (b.attention || []).length - (a.attention || []).length);
+      m.appendChild(table(["", "PR", "Score", "Effort", "Merge-ready", "Matches the issue", "Security", "Actions", "Review", "Labels", "Author"], prs.map(p => {
+        const f = (p.review && p.review.fields) || {};
+        const att = el("td", null, (p.attention || []).length ? "attention" : "");
+        if ((p.attention || []).length) { att.appendChild(el("span", "⚠ ", "warn")); att.appendChild(el("span", p.attention.join(", "))); att.title = "A person should look at this PR"; }
         const actions = el("td", null, "actions");
         const mk = (label, action, cls, question) => { const b = el("button", label, cls); b.addEventListener("click", async () => {
           if (!confirm(question)) return;
@@ -116,8 +120,13 @@ const render = {
         const close = mk("Close", "close", "danger", "Close " + repo + "#" + p.number + " without merging? (It can be reopened on GitHub.)");
         close.title = "Close without merging (asks first)"; actions.appendChild(close);
         if (why) actions.appendChild(el("div", "Merge: " + why, "muted small"));
-        const rev = el("td"); if (p.review) { rev.appendChild(el("pre", p.review.body)); if (!p.review.current) rev.appendChild(el("p", "review is for an older commit", "muted")); } else rev.appendChild(el("span", "not reviewed yet", "muted"));
-        return [td(link("#" + p.number + " " + p.title, p.url)), actions, rev, p.labels.join(", "), p.author];
+        const ready = f.merge_ready === true ? "yes" : f.merge_ready === false ? "no" + (f.why_not ? " — " + f.why_not : "") : "";
+        const rev = el("td");
+        if (p.review) { rev.appendChild(details(p.review.current ? "full review" : "full review (older commit)", p.review.body)); } else rev.appendChild(el("span", "not reviewed yet", "muted"));
+        return [att, td(link("#" + p.number + " " + p.title, p.url)), f.score === null || f.score === undefined ? "" : f.score + "/10",
+          f.effort === null || f.effort === undefined ? "" : f.effort + "/5", ready, f.matches || "",
+          (f.security || []).length ? el("td", f.security.join("; "), "failed") : "none", actions, rev, p.labels.join(", "),
+          p.author + (p.from_fork ? " (fork)" : "")];
       })));
     }
   },

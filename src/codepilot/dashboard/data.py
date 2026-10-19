@@ -4,6 +4,7 @@ the page renders it with textContent only."""
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timezone
 import sqlite3
 from pathlib import Path
@@ -180,6 +181,45 @@ def audit(conn, limit: int = 500) -> dict:
     return {"events": [dict(e) for e in conn.execute("select * from events order by id desc limit ?", (limit,))]}
 
 
+def parse_review(body: str) -> dict:
+    """The independent reviewer's comment, split into fields for the PR table (its format is fixed by review.py)."""
+    b = body or ""
+    num = lambda pat: int(m.group(1)) if (m := re.search(pat, b)) else None      # noqa: E731
+    matches = re.search(r"\*\*Matches the issue:\*\*\s*(.+)", b)
+    sec = re.search(r"\*\*Security concerns:\*\*\n((?:- .+\n?)+)", b)
+    ready = re.search(r"\*\*Merge-ready:\*\*\s*(yes|no)(?:\s*—\s*(.+))?", b)
+    return {"score": num(r"\*\*Score:\*\*\s*(\d+)/10"), "effort": num(r"\*\*Review effort:\*\*\s*(\d+)/5"),
+            "matches": matches.group(1).strip() if matches else "",
+            "security": [x[2:].strip() for x in sec.group(1).strip().splitlines()] if sec else [],
+            "merge_ready": (ready.group(1) == "yes") if ready else None,
+            "why_not": (ready.group(2) or "").strip() if ready else "",
+            "tests_not_run": "Tests not run" in b}
+
+
+MIN_SCORE = 7
+
+
+def attention(pr: dict) -> list[str]:
+    """Why a person should look at this PR now (empty = nothing unusual)."""
+    why = []
+    if pr.get("from_fork"):
+        why.append("from a fork")
+    rev = pr.get("review")
+    if not rev:
+        why.append("not reviewed yet")
+        return why
+    f = rev.get("fields") or {}
+    if not rev.get("current", True):
+        why.append("review is for an older commit")
+    if f.get("security"):
+        why.append("security concerns")
+    if f.get("score") is not None and f["score"] < MIN_SCORE:
+        why.append(f"low score ({f['score']}/10)")
+    if f.get("tests_not_run") and not pr.get("from_fork"):
+        why.append("tests not run")
+    return why
+
+
 def pull_requests(repo, reviewer_login: str | None) -> list[dict]:
     out = []
     for pr in repo.get_pulls(state="open"):
@@ -189,10 +229,15 @@ def pull_requests(repo, reviewer_login: str | None) -> list[dict]:
             mine = [r for r in pr.get_reviews() if r.user and r.user.login == reviewer_login]
             if mine:
                 last = mine[-1]
-                review = {"body": (last.body or "")[:4000], "commit_id": last.commit_id, "current": last.commit_id == pr.head.sha}
-        out.append({"number": pr.number, "title": pr.title, "author": pr.user.login if pr.user else "", "url": pr.html_url,
-                    "head_sha": pr.head.sha, "labels": labels, "codepilot": "codepilot-generated" in labels,
-                    "merge_ready": "merge-ready" in labels, "mergeable": pr.mergeable, "review": review})
+                review = {"body": (last.body or "")[:4000], "commit_id": last.commit_id, "current": last.commit_id == pr.head.sha,
+                          "fields": parse_review(last.body or "")}
+        head_repo = getattr(getattr(pr.head, "repo", None), "full_name", None)
+        row = {"number": pr.number, "title": pr.title, "author": pr.user.login if pr.user else "", "url": pr.html_url,
+               "head_sha": pr.head.sha, "labels": labels, "codepilot": "codepilot-generated" in labels,
+               "merge_ready": "merge-ready" in labels, "mergeable": pr.mergeable, "review": review,
+               "from_fork": bool(head_repo) and head_repo != getattr(repo, "full_name", head_repo)}
+        row["attention"] = attention(row)
+        out.append(row)
     return out
 
 

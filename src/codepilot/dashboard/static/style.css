@@ -36,3 +36,5 @@ code { background: color-mix(in srgb, var(--accent) 12%, transparent); padding: 
 .table-wrap th:first-child, .table-wrap td:first-child { position: sticky; left: 0; z-index: 1; background: var(--card); background-clip: padding-box; box-shadow: 2px 0 0 var(--line); }
 .table-wrap th:first-child { background: var(--bg); }
 td.title { min-width: 220px; }
+td.attention { background: color-mix(in srgb, #d29922 22%, transparent); font-weight: 600; min-width: 160px; }
+span.warn { color: #d29922; font-size: 16px; }
