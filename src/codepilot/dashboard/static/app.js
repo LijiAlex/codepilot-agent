@@ -124,8 +124,10 @@ const render = {
     if (d.usage) {                                     // from LangSmith traces
       const sum = (o) => Object.values(o).reduce((a, u) => ({ cost: a.cost + (u.cost || 0), tokens_in: a.tokens_in + (u.tokens_in || 0), tokens_out: a.tokens_out + (u.tokens_out || 0) }), { cost: 0, tokens_in: 0, tokens_out: 0 });
       const rv = d.usage.reviewer || {}, sc = d.usage.screen || {};
-      const rows = [["Agents (all runs)", plural(Object.keys(d.usage.runs || {}).length, "run"), sum(d.usage.runs || {})],
+      const im = d.usage.improvement || {};
+      const rows = [["Solver agents — Orchestrator, Explorer, Coder, Test Agent, PR Agent (incl. triage)", plural(Object.keys(d.usage.runs || {}).length, "run"), sum(d.usage.runs || {})],
         ["Injection screen (NeMo, Haiku)", plural(sc.count || 0, "screen"), sc],
+        ["Self-improvement — skill gap reports", plural(im.count || 0, "report"), im],
         ["Independent reviewer (GitHub Action)", plural(rv.count || 0, "PR review"), rv]];
       m.appendChild(el("h2", "Where the tokens and cost go (from LangSmith traces)"));
       m.appendChild(table(["Part", "Count", "Tokens in", "Tokens out", "Cost (USD)"], rows.map(([k, n, u]) => [k, n, num(u.tokens_in || 0), num(u.tokens_out || 0), "$" + (u.cost || 0).toFixed(3)])));

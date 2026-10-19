@@ -40,13 +40,15 @@ def langsmith_usage(client: Any, project: str, reviewer_project: str | None = No
         bucket["cost"] = round(bucket.get("cost", 0.0) + float(getattr(r, "total_cost", None) or 0), 6)
         bucket["tokens_in"] = bucket.get("tokens_in", 0) + int(getattr(r, "prompt_tokens", None) or 0)
         bucket["tokens_out"] = bucket.get("tokens_out", 0) + int(getattr(r, "completion_tokens", None) or 0)
-    out: dict = {"runs": {}, "screen": {}, "reviewer": {}, "reviewer_by_pr": {}}
+    out: dict = {"runs": {}, "screen": {}, "improvement": {}, "reviewer": {}, "reviewer_by_pr": {}}
     for r in client.list_runs(project_name=project, is_root=True, limit=limit):
         meta = (getattr(r, "extra", None) or {}).get("metadata") or {}
         if meta.get("run_id"):
             add(out["runs"].setdefault(meta["run_id"], {}), r)
         elif meta.get("kind") == "injection-screen":
             add(out["screen"], r)
+        elif meta.get("kind") == "skill-gap-report":                 # self-improvement: trace analysis → skill gap report
+            add(out["improvement"], r)
     if reviewer_project:
         for r in client.list_runs(project_name=reviewer_project, is_root=True, limit=limit):
             add(out["reviewer"], r)
@@ -66,7 +68,7 @@ def overview(conn: sqlite3.Connection, cost_tracked: bool = False, trace_costs: 
         proposals = 0
     if trace_usage:
         trace_costs = {rid: u.get("cost", 0.0) for rid, u in trace_usage["runs"].items()}
-        extra = trace_usage["screen"].get("cost", 0.0) + trace_usage["reviewer"].get("cost", 0.0)
+        extra = sum(trace_usage.get(k, {}).get("cost", 0.0) for k in ("screen", "improvement", "reviewer"))
     else:
         extra = 0.0
     return {"runs": sum(by_state.values()), "by_state": by_state, "usage": trace_usage,
@@ -75,8 +77,8 @@ def overview(conn: sqlite3.Connection, cost_tracked: bool = False, trace_costs: 
             "commands_refused": count("command_refused"), "issues_blocked": count("issue_blocked"),
             "proposals_waiting": proposals,
             "tokens_in": tok["ti"], "tokens_out": tok["tout"],
-            "cost_usd": (round(sum(trace_costs.values()) + extra, 2) if trace_costs else round(tok["c"] or 0, 2) if cost_tracked else None),
-            "cost_source": "LangSmith" if trace_costs else ("codepilot.yml prices" if cost_tracked else None)}
+            "cost_usd": (round(sum((trace_costs or {}).values()) + extra, 2) if (trace_costs or trace_usage) else round(tok["c"] or 0, 2) if cost_tracked else None),
+            "cost_source": "LangSmith" if (trace_costs or trace_usage) else ("codepilot.yml prices" if cost_tracked else None)}
 
 
 def overview_skills(conn: sqlite3.Connection, repos: list[str]) -> dict:

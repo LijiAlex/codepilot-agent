@@ -288,7 +288,8 @@ class Worker:
                 tr = TriageResult(**seed.triage)
             else:
                 tr = triage(s.triage_model(), issue_text,
-                            build_repo_map(mpath, base_sha, budget_tokens=s.settings.repo_map_budget_tokens, entries=entries).text)
+                            build_repo_map(mpath, base_sha, budget_tokens=s.settings.repo_map_budget_tokens, entries=entries).text,
+                            config=self._trace_config(run_id, item, "triage"))
             skill = self.skills[tr.task_type]
             self._facts[run_id]["task_type"] = tr.task_type
             s.runs.update(run_id, task_type=tr.task_type, complexity=tr.complexity, base_sha=base_sha, skill=skill.display_name)
@@ -298,7 +299,8 @@ class Worker:
                 return self._finish(rec, run_id, item, RunState.SKIPPED, "above_threshold")
             if needs_plan(tr, s.settings.complexity_threshold, seed.plan_approved):
                 plan = propose_plan(s.triage_model(), issue_text,
-                                    build_repo_map(mpath, base_sha, budget_tokens=s.settings.repo_map_budget_tokens, entries=entries).text, tr)
+                                    build_repo_map(mpath, base_sha, budget_tokens=s.settings.repo_map_budget_tokens, entries=entries).text, tr,
+                                    config=self._trace_config(run_id, item, "plan"))
                 hid = s.handoffs.create(run_id, repo.full_name, item.key, "continue_complex",
                                         {"plan": plan.model_dump(), "triage": tr.model_dump(), "base_sha": base_sha, **item.payload()})
                 return self._finish(rec, run_id, item, RunState.AWAITING_APPROVAL, "complex", hid)
@@ -422,6 +424,11 @@ class Worker:
                     provider.delete(handle)
                 except Exception as e:                               # noqa: BLE001 — the sweep removes it later
                     s.audit.log("worker", "sandbox_delete_failed", run_id=run_id, result="error", detail={"msg": redact(str(e))[:200]})
+
+    def _trace_config(self, run_id: str, item, kind: str) -> dict:
+        """LangSmith config for model calls made outside the agent graph (triage, plan): same run_id, so they count in the run."""
+        return {"callbacks": [self.s.tracer] if self.s.tracer else [], "run_name": kind,
+                "metadata": {"run_id": run_id, "issue": item.key, "repo": item.repo.full_name, "kind": kind}}
 
     def recover(self) -> list[str]:
         """Startup (spec §4.2): in-flight runs → FAILED(crashed), every leftover sandbox deleted."""

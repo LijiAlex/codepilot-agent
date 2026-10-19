@@ -57,11 +57,12 @@ class GapReport(BaseModel):
 _FORBIDDEN = re.compile(r"(?i)secret|credential|token|password|\.env|disable|skip (the )?(check|guard|test)|network|curl|wget|pip install")
 
 
-def build_report(model, trace: dict, skill_text: str) -> GapReport:
+def build_report(model, trace: dict, skill_text: str, config: dict | None = None) -> GapReport:
     outcome = {k: trace[k] for k in ("outcome", "reason", "first_try_test_pass", "changed_files")}
     user = (f"<repo_skill>\n{skill_text or '(none yet)'}\n</repo_skill>\n\n<outcome>{json.dumps(outcome)}</outcome>\n\n"
             f"<trace>{json.dumps({k: v for k, v in trace.items() if k not in outcome})}</trace>")
-    report = structured(model, GapReport).invoke([{"role": "system", "content": GAP_PROMPT}, {"role": "user", "content": user}])
+    report = structured(model, GapReport).invoke([{"role": "system", "content": GAP_PROMPT}, {"role": "user", "content": user}],
+                                                  config=config)
     report.proposals = [p for p in report.proposals if not _FORBIDDEN.search(p.text)]     # code-side filter, not only the prompt
     return report
 
@@ -230,8 +231,9 @@ class ImprovementStore:
 class Improver:
     """Runs on the worker thread after every run (it is the single writer for repo-skill data)."""
 
-    def __init__(self, conn, runs_dir: Path, store: ImprovementStore, model_factory, audit):
+    def __init__(self, conn, runs_dir: Path, store: ImprovementStore, model_factory, audit, tracer=None):
         self.conn, self.runs_dir, self.store, self.model_factory, self.audit = conn, Path(runs_dir), store, model_factory, audit
+        self.tracer = tracer                                  # LangSmith: self-improvement shows as its own cost line
 
     def after_run(self, run_id: str) -> dict | None:
         trace = analyse_run(self.conn, self.runs_dir, run_id)
@@ -240,7 +242,9 @@ class Improver:
         save(self.runs_dir, trace)
         self.store.record_trace(trace)
         _, skill_text = self.store.skills.render(trace["repo"])
-        report = build_report(self.model_factory(), trace, skill_text)
+        report = build_report(self.model_factory(), trace, skill_text,
+                              config={"callbacks": [self.tracer] if self.tracer else [], "run_name": "skill-gap-report",
+                                      "metadata": {"kind": "skill-gap-report", "for_run": run_id, "repo": trace["repo"]}})
         (self.runs_dir / run_id / "skill_gap_report.json").write_text(report.model_dump_json(indent=1))
         ids = self.store.record_report(trace["repo"], run_id, report)
         self.audit.log("improver", "skill_gap_report", run_id=run_id, detail={"proposals": ids})

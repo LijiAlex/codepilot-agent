@@ -448,3 +448,17 @@ def test_page_has_the_qa_review_improvements():
     assert "Past decisions" in js and 'el("summary", "evidence")' in js                                          # improvements
     assert "Last refreshed" in js and "Auto-refresh" in js and js.count("local time") == 1                        # header, once
     assert "--link" in css and "@keyframes spin" in css
+
+
+def test_self_improvement_calls_have_their_own_usage_line(env):
+    from codepilot.dashboard import data
+    class FakeLS:
+        def list_runs(self, project_name, is_root, limit):
+            if project_name == "codepilot-plus":
+                return [NS(extra={"metadata": {"kind": "skill-gap-report", "for_run": env.rid}}, total_cost=0.03, prompt_tokens=900, completion_tokens=120)]
+            return []
+    u = data.langsmith_usage(FakeLS(), "codepilot-plus", "codepilot-reviewer")
+    assert u["improvement"] == {"count": 1, "cost": 0.03, "tokens_in": 900, "tokens_out": 120} and u["runs"] == {}
+    assert data.overview(env.conn, trace_usage=u)["cost_usd"] == 0.03
+    js = (Path(__file__).parents[1] / "src" / "codepilot" / "dashboard" / "static" / "app.js").read_text()
+    assert "Solver agents" in js and "Self-improvement" in js

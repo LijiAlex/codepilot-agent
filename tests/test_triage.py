@@ -47,3 +47,26 @@ def test_real_model_construction_and_profile_key(monkeypatch):
     m = make_model("anthropic:claude-sonnet-5-5")
     assert register_profiles(m) == "anthropic"
     assert register_profiles(FakeClaude(responses=[])) == "anthropic"     # fakes resolve the same profile
+
+
+def test_triage_and_gap_report_calls_carry_the_tracer_and_a_kind():
+    from langchain_core.callbacks import BaseCallbackHandler
+    from codepilot.agents.triage import triage
+    from codepilot.improve.gaps import build_report
+
+    class Seen(BaseCallbackHandler):
+        def __init__(self): self.kinds = []
+        def on_chat_model_start(self, serialized, messages, *, run_id, parent_run_id=None, tags=None, metadata=None, **kw):
+            self.kinds.append((metadata or {}).get("kind"))
+    seen = Seen()
+    tr = {"task_type": "bug_fix", "complexity": 2, "skill": "bug_fix_skill", "reasons": ["x"], "summary": "s"}
+    try:
+        triage(FakeClaude(responses=[tool_call("TriageResult", tr, "1")]), "issue", "map",
+               config={"callbacks": [seen], "metadata": {"kind": "triage", "run_id": "r1"}})
+    except Exception:
+        pass                                                         # schema details are covered elsewhere; only the call matters
+    gap = {"summary": "s", "proposals": []}
+    trace = {"outcome": "x", "reason": None, "first_try_test_pass": None, "changed_files": []}
+    build_report(FakeClaude(responses=[tool_call("GapReport", gap, "1")]), trace, "",
+                 config={"callbacks": [seen], "metadata": {"kind": "skill-gap-report", "run_id": "r1"}})
+    assert "triage" in seen.kinds and "skill-gap-report" in seen.kinds

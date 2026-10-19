@@ -99,5 +99,5 @@ def build_engine(settings: Settings, ui: UiCallbacks, config_dir: Path = Path(".
                                       repo_factory=repo_factory, lessons=lessons, on_notice=ui.on_notice, runs_dir=home / "runs"))
     by_name = {r.full_name: r for r in settings.repos}
     cs = ContinuationServices(publish=ps, repo_config=by_name.__getitem__, lessons=lessons, cancel_run=worker.cancel)
-    improver = Improver(conn, home / "runs", ImprovementStore(conn, skill_store, embed=lazy_embedder()), solver, audit)
+    improver = Improver(conn, home / "runs", ImprovementStore(conn, skill_store, embed=lazy_embedder()), solver, audit, tracer=tracer)
     return Engine(settings, worker, poller, watcher, cs, episodic, ui, selfcheck=run_selfcheck, improver=improver)

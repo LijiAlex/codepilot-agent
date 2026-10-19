@@ -52,12 +52,12 @@ class ComplexPlan(BaseModel):
     est_minutes: int = Field(ge=1, le=240)
 
 
-def _structured(model, schema, system: str, user: str, attempts: int = 2):
+def _structured(model, schema, system: str, user: str, attempts: int = 2, config: dict | None = None):
     runnable = structured(model, schema)
     last: Exception | None = None
     for _ in range(attempts):
         try:
-            out = runnable.invoke([{"role": "system", "content": system}, {"role": "user", "content": user}])
+            out = runnable.invoke([{"role": "system", "content": system}, {"role": "user", "content": user}], config=config)
             if isinstance(out, schema):
                 return out
             last = TriageError(f"model returned {type(out).__name__}, not {schema.__name__}")
@@ -66,9 +66,9 @@ def _structured(model, schema, system: str, user: str, attempts: int = 2):
     raise TriageError(f"{schema.__name__} failed: {last}")
 
 
-def triage(model, issue_text: str, repo_map_text: str) -> TriageResult:
+def triage(model, issue_text: str, repo_map_text: str, config: dict | None = None) -> TriageResult:
     user = f"<untrusted_issue>\n{issue_text}\n</untrusted_issue>\n\n<repo_map>\n{repo_map_text[:6000]}\n</repo_map>"
-    return _structured(model, TriageResult, TRIAGE_PROMPT, user)
+    return _structured(model, TriageResult, TRIAGE_PROMPT, user, config=config)
 
 
 def needs_plan(result: TriageResult, threshold: int, plan_approved: bool = False) -> bool:
@@ -76,10 +76,10 @@ def needs_plan(result: TriageResult, threshold: int, plan_approved: bool = False
     return not plan_approved and result.complexity > threshold
 
 
-def propose_plan(model, issue_text: str, repo_map_text: str, result: TriageResult) -> ComplexPlan:
+def propose_plan(model, issue_text: str, repo_map_text: str, result: TriageResult, config: dict | None = None) -> ComplexPlan:
     user = (f"<untrusted_issue>\n{issue_text}\n</untrusted_issue>\n\nClassification: {result.model_dump_json()}\n\n"
             f"<repo_map>\n{repo_map_text}\n</repo_map>")
-    plan = _structured(model, ComplexPlan, PLAN_PROMPT, user)
+    plan = _structured(model, ComplexPlan, PLAN_PROMPT, user, config=config)
     plan.score = result.complexity
     return plan
 
