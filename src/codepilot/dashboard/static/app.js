@@ -5,12 +5,19 @@ const PAGES = [
   ["runs", "Runs", "Every run and the stages it reached. Click a run ID for its diff, log and analysis."],
   ["prs", "Pull requests", "Open pull requests with the independent review. Merge needs a current review that says merge-ready."],
   ["safety", "Safety", "What the guardrails refused or held back, and the measured injection screen."],
+  ["evaluation", "Evaluation", "One verdict from rule checks on every run, the independent reviewer as judge (tested with probes), golden issues with hidden tests, and the injection screen."],
   ["context", "Context", "How much context runs were given: the repo map per repository against its budget, and the lessons each run recalled."],
   ["memory", "Memory", "Lessons learned from past work, and a summary of each recent session."],
   ["skills", "Skills", "The five task skills and each repository's own skill (its versions)."],
   ["audit", "Audit log", "Every action, by whom, in order."],
   ["improvements", "Improvements", "Proposed changes to a repository's skill, waiting for a person, and how runs went per skill version."],
 ];
+const SIGNAL_NAMES = { heuristics_pass_rate: "Rule checks passed", expected_outcome_rate: "Golden issues: expected outcome",
+  triage_accuracy: "Triage accuracy", hidden_tests_passed: "Hidden tests passed", judge_mean: "Judge score (mean)",
+  judge_probes: "Judge probes right", injection_blocked: "Attacks blocked", false_alarms: "False alarms" };
+const PROBE_NAMES = { "deleted-test": "Deletes the failing test", "off-topic": "Change unrelated to the issue",
+  "hardcoded-secret": "Hard-coded key", "correct-fix": "Correct fix (control)" };
+function rubricText(r) { const e = Object.entries(r || {}); return e.length ? e.map(([k, v]) => k + " " + v + "/2").join(" · ") : ""; }
 const STATUS = { PR_OPENED: "PR opened", AWAITING_APPROVAL: "Waiting for approval", FAILED: "Failed", DONE: "Merged",   // one casing style: sentence case
   CLOSED: "Closed", SKIPPED: "Skipped", EXPLORING: "Exploring", IMPLEMENTING: "Implementing", TESTING: "Testing", TRIAGED: "Triaged" };
 let token = "";
@@ -296,6 +303,54 @@ const render = {
           p.author + (p.from_fork ? " (fork)" : "")];
       })));
     }
+  },
+  async evaluation(m) {
+    const d = await api("eval");
+    if (d.missing) { m.appendChild(el("p", "No evaluation yet. Run it from the repository:", "muted")); m.appendChild(el("pre", d.how)); return; }
+    const v = el("div", null, "verdict " + (d.verdict === "PASS" ? "pass" : "fail"));
+    v.appendChild(el("b", "Verdict: " + d.verdict));
+    v.appendChild(el("span", d.failed.length ? "Below their line: " + d.failed.map(n => SIGNAL_NAMES[n] || n).join(", ") : "Every signal that could run cleared its line."));
+    v.appendChild(el("span", "Measured " + when(d.measured_at), "muted small"));
+    m.appendChild(v);
+    const grid = el("div", null, "sigs");
+    d.signals.forEach(s => {
+      const t = el("div", null, "sig " + (s.status === "pass" ? "pass" : s.status === "FAIL" ? "fail" : "na"));
+      t.title = s.meaning;
+      t.appendChild(el("span", SIGNAL_NAMES[s.name] || s.name, "sig-name"));
+      t.appendChild(el("b", s.value === null ? "—" : s.name === "judge_mean" ? (s.value * 10).toFixed(1) + "/10" : pct(s.value)));
+      const line = s.line === null || s.line === undefined ? "" : (s.direction === "min" ? "must be ≥ " : "must be ≤ ") +
+        (s.name === "judge_mean" ? (s.line * 10).toFixed(1) + "/10" : pct(s.line));
+      t.appendChild(el("span", line + (s.basis && s.basis !== "fixed" ? " (" + s.basis + ")" : ""), "small"));
+      t.appendChild(el("span", s.coverage, "small muted"));
+      t.appendChild(el("span", s.status === "pass" ? "pass" : s.status === "FAIL" ? "below the line" : s.status, "badge"));
+      grid.appendChild(t);
+    });
+    m.appendChild(grid);
+    m.appendChild(el("p", "Hover a block for what it measures. Unavailable or incomparable signals never fail the verdict: a metric that could not look did not find anything wrong.", "muted small"));
+
+    m.appendChild(el("h2", "Rule checks (no model)"));
+    m.appendChild(el("p", "n/a means there was nothing to inspect — for example, PR checks on a run that opened no PR. It is counted apart, never as a pass.", "muted"));
+    m.appendChild(table(["Check", "What it checks", "Pass", "Fail", "n/a"], Object.entries(d.checks).map(([k, c]) =>
+      [words(k), (d.meaning || {})[k] || "", num(c.pass), c.fail ? el("td", num(c.fail), "failed") : "0", num(c["n/a"])])));
+    const fails = []; (d.runs || []).forEach(r => r.checks.forEach(c => { if (c.status === "fail") fails.push([td(runLink(r.run_id)), r.repo + " " + r.issue, words(c.name), c.detail]); }));
+    if (fails.length) { m.appendChild(el("h3", "Failed checks")); m.appendChild(table(["Run", "Issue", "Check", "Detail"], fails)); }
+
+    m.appendChild(el("h2", "Judge: the independent reviewer"));
+    m.appendChild(el("p", "The agents write code on Claude; the reviewer grades on an OpenAI model, so the system never grades its own work. Probes are fixed pull requests that never come from CodePilot+: the three bad ones must score below the merge line, the correct fix above it.", "muted"));
+    m.appendChild(table(["Probe", "Expected", "Score", "Rubric", "Merge-ready", "Judge right?"], (d.probe_rows || []).map(p => [
+      PROBE_NAMES[p.key] || p.key, p.expect === "reject" ? "reject" : "accept", p.score + "/10", rubricText(p.rubric),
+      p.merge_ready ? "yes" : "no", el("td", p.behaved ? "✓ yes" : "✗ no", p.behaved ? "done" : "failed")])));
+    m.appendChild(el("h3", "Scores on CodePilot+ pull requests"));
+    m.appendChild(table(["PR", "Run", "Score", "Rubric", "Merge-ready"], (d.judge || []).map(j => [
+      td(link(j.repo + "#" + j.pr, "https://github.com/" + j.repo + "/pull/" + j.pr)), td(runLink(j.run_id)), j.score + "/10",
+      rubricText(j.rubric) || el("td", "older review format (no rubric)", "muted"), j.merge_ready === true ? "yes" : j.merge_ready === false ? "no" : ""])));
+
+    m.appendChild(el("h2", "Golden issues"));
+    m.appendChild(el("p", "Issues filed on the playground with the outcome CodePilot+ should reach. A PR's hidden test is never shown to the agents; it is added to the PR's code afterwards and must pass.", "muted"));
+    m.appendChild(table(["Issue", "Type", "Expected", "Ended", "Reached", "Hidden test"], (d.golden_rows || []).map(g => [
+      g.key + (g.issue ? " (#" + g.issue + ")" : " (not filed)"), words(g.type), words(g.expect), g.ended ? "yes" : el("td", "not yet", "muted"),
+      !g.ended ? el("td", "–", "muted") : el("td", g.met ? "✓ yes" : "✗ no", g.met ? "done" : "failed"),
+      g.resolved === null || g.resolved === undefined ? el("td", "–", "muted") : el("td", g.resolved ? "✓ pass" : "✗ fail", g.resolved ? "done" : "failed")])));
   },
   async safety(m) {
     const d = await api("safety");

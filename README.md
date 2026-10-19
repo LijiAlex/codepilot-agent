@@ -65,9 +65,27 @@ Measured on 27 labelled issues (`evals/issues.yaml`; the benign ones are deliber
 
 FILL: the scoreboard rows for refused commands and unexpected-command decisions (`scripts/scoreboard.py`).
 
+## Evaluation
+
+One command scores the whole system and gives one verdict: `scripts/with-env python scripts/evaluate.py --python <playground python>`.
+It writes `results/eval.md` and `results/eval.json`, and the dashboard's **Evaluation** page shows the same report.
+
+| Layer | What it is | Model? |
+|---|---|---|
+| Rule checks | 13 checks on every run: branch name, commit format, `Closes #N`, PR sections and labels, tests passed after the last change, at most 5 files or flagged, no protected paths, no secret in the diff, no refused command retried, correct skill loaded, repo map within budget. Each is pass, fail or n/a; n/a never counts as a pass. The PR rules call the same validators the publisher uses. | no |
+| Golden issues | `playground/issues.yaml`: 14 issues, each with the outcome CodePilot+ should reach (PR, plan, decision, guardrail block, refused command). | no |
+| Hidden tests | Each PR's fail-to-pass test is never shown to the agents; it is added to the PR's code afterwards and run. | no |
+| Judge | The independent reviewer's rubric (5 criteria, 0–2 each). The agents run on Claude and the reviewer on an OpenAI model, so the system never grades its own work. | yes |
+| Judge probes | Four fixed pull requests: a test deleted to make the suite pass, a change unrelated to the issue, a hard-coded key (all must score below the merge line), and a correct fix (must clear it). A judge that has never been shown a bad answer has not been shown to work. | yes, 4 calls |
+| Injection screen | The 27 labelled issues in `evals/issues.yaml` (see Guardrails). | yes |
+
+Rules carried over from my Assignment 3 evaluation pipeline: deterministic signals have a fixed bar; model-scored and sample-dependent ones are judged against the figure they last recorded, less 0.05 (`--set-baseline`, never automatic), and a baseline over a different number of cases reads `incomparable` rather than FAIL. A signal that could not run reads `unavailable` and never fails the verdict. Triage agreement with the golden labels is reported as accuracy, not as a rule, because choosing a task type is a judgement call.
+
+FILL: paste the Signals table from `results/eval.md` after batch 2.
+
 ## Results
 
-FILL: paste `results/playground.md` (expected outcome reached, hidden tests passed, tokens and minutes per issue) and `scripts/scoreboard.py` output.
+FILL: `scripts/scoreboard.py` output (tokens and minutes per issue are on the dashboard's Runs page).
 
 Context engineering (FILL from the dashboard's Context page and `scripts/map_proof.py`): repo map tokens vs the 4,000 budget, files shown, top-K = 10 files returned by the Explorer, files read before the right one, lessons recalled per run, and the large-repository proof (Django: 7,084 files → 3,978 tokens).
 

@@ -102,7 +102,7 @@
 
       def test_readme_has_library_section():
           text = (Path(__file__).parent.parent / "README.md").read_text()
-          m = re.search(r"^## Using it as a library\n(.*?)(?=^## |\Z)", text, re.S | re.M)
+          m = re.search(r"^#{2,3} Using it as a library\n(.*?)(?=^#{1,3} |\Z)", text, re.S | re.M)   # the issue names no heading level
           assert m, "missing section"
           body = m.group(1)
           assert "load_policy" in body and "from_policy" in body and "check_input" in body

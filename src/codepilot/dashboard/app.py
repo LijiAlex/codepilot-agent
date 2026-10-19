@@ -156,6 +156,10 @@ def create_app(deps: DashboardDeps, token: str, port: int) -> FastAPI:
     def close(owner: str, name: str, number: int, body: PRAction):
         return _pr_action(f"{owner}/{name}", number, body, "close")
 
+    @app.get("/api/eval")
+    def evaluation():
+        return data.evaluation(deps.results_dir)
+
     @app.get("/api/safety")
     def safety():
         return data.safety(deps.conn, deps.results_dir)

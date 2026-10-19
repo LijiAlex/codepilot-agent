@@ -252,6 +252,16 @@ def _measurement(g: Path) -> dict | None:
     return m
 
 
+def evaluation(results_dir: Path) -> dict:
+    """The last report written by scripts/evaluate.py (the dashboard never runs the evaluation: it costs model calls)."""
+    p = results_dir / "eval.json"
+    if not p.exists():
+        return {"missing": True, "how": "scripts/with-env python scripts/evaluate.py --python <playground python>"}
+    d = json.loads(p.read_text())
+    d["measured_at"] = datetime.fromtimestamp(p.stat().st_mtime, timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    return d
+
+
 def context(conn, runs_dir: Path, budget: int = 4000) -> dict:
     out = []
     for r in conn.execute("select * from runs where task_type is not null order by created_at desc limit 100"):

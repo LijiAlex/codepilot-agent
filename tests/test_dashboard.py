@@ -510,7 +510,8 @@ def test_success_rate_is_per_issue_on_the_latest_run(tmp_path):
 def test_every_page_renders_without_a_javascript_error(env, tmp_path):
     # live 2026-10-19: Overview showed "st is not defined" — syntax checks and API tests cannot catch runtime errors
     import subprocess
-    c, pages = env.client, ["overview", "matrix", "prs", "safety", "context", "memory", "skills", "audit", "improvements"]
+    _write_eval(tmp_path / "results")
+    c, pages = env.client, ["overview", "matrix", "prs", "safety", "context", "memory", "skills", "audit", "improvements", "eval"]
     resp = {p: c.get(f"/api/{p}", headers=H).json() for p in pages}
     resp["run"] = c.get(f"/api/runs/{env.rid}", headers=H).json()
     (tmp_path / "r.json").write_text(json.dumps(resp))
@@ -537,3 +538,27 @@ def test_overview_summary_has_safety_and_learning_panels(env):
     assert s["safety"]["refused"] == 4 and s["safety"]["top_rules"][0] == ["inline-python", 2]   # fixture has 1 git push
     assert s["learning"]["lessons"] == 2 and s["learning"]["waiting"] == 1
     assert s["learning"]["failed_commands"] == {"o/r": {"from": 1.5, "to": 0.5, "versions": [1, 2]}}
+
+
+def _write_eval(results):
+    from codepilot.evals import heuristics, report
+    rep = report.build({"pr_labelled": {"pass": 2, "fail": 1, "n/a": 0}}, [{"met": True, "ended": True, "key": "k", "issue": 1,
+                       "type": "bug_fix", "expect": "pr", "resolved": True}], [True], [9], [{"behaved": True}], None, {})
+    rep |= {"meaning": heuristics.MEANING, "judge": [{"repo": "o/r", "pr": 3, "run_id": "r1", "score": 9,
+                                                      "rubric": {"tests": 2}, "merge_ready": True, "cap": ""}],
+            "probe_rows": [{"key": "deleted-test", "expect": "reject", "score": 1, "merge_ready": False, "behaved": True,
+                            "rubric": {"tests": 0}, "security": [], "why": ["score 1 < 8"], "cap": ""}],
+            "golden_rows": [{"key": "k", "issue": 1, "type": "bug_fix", "expect": "pr", "ended": True, "met": True, "resolved": True}],
+            "runs": [{"run_id": "r1", "repo": "o/r", "issue": "#1", "state": "DONE", "pr": 3,
+                      "checks": [{"name": "pr_labelled", "status": "fail", "detail": "x"}]}]}
+    results.mkdir(parents=True, exist_ok=True)
+    (results / "eval.json").write_text(json.dumps(rep))
+
+
+def test_eval_page_reads_the_last_report_or_says_how_to_make_one(env, tmp_path):
+    missing = env.client.get("/api/eval", headers=H).json()
+    assert missing["missing"] is True and "scripts/evaluate.py" in missing["how"]
+    _write_eval(tmp_path / "results")
+    d = env.client.get("/api/eval", headers=H).json()
+    assert d["verdict"] == "FAIL" and d["probe_rows"][0]["key"] == "deleted-test" and "measured_at" in d
+    assert env.client.get("/api/eval", headers={"host": H["host"]}).status_code == 401                      # same token rule as every page
