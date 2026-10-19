@@ -151,4 +151,4 @@ Bonus items done: self-healing tests (a test-doctor agent fixes broken test setu
 
 ## Credits
 
-The issue screen reuses my earlier bootcamp project, [guardrail-eval-pipeline](FILL: link), as a package; the test repository `codepilot-playground` is a copy of it with deliberately planted defects. Built with DeepAgents, LangGraph, LangChain, NeMo Guardrails, Textual, ChromaDB, PyGithub and Daytona.
+The issue screen reuses my earlier bootcamp project, [guardrail-eval-pipeline](https://github.com/LijiAlex/guardrail-eval-pipeline), as a package; the test repository `codepilot-playground` is a copy of it with deliberately planted defects. Built with DeepAgents, LangGraph, LangChain, NeMo Guardrails, Textual, ChromaDB, PyGithub and Daytona.
