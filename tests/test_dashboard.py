@@ -462,3 +462,19 @@ def test_self_improvement_calls_have_their_own_usage_line(env):
     assert data.overview(env.conn, trace_usage=u)["cost_usd"] == 0.03
     js = (Path(__file__).parents[1] / "src" / "codepilot" / "dashboard" / "static" / "app.js").read_text()
     assert "Solver agents" in js and "Self-improvement" in js
+
+
+def test_safety_rows_name_the_guard_and_rule(env):
+    from codepilot.audit import AuditLog
+    from codepilot.dashboard.data import safety
+    a = AuditLog(env.conn)
+    a.log("agent:coder", "command_refused", run_id=env.rid, target="python -m pip show x", result="refused",
+          detail={"reason": "python -m pip is not allowed"})                                   # old row: no rule stored
+    a.log("agent:coder", "tool_refused", run_id=env.rid, target="task", result="refused")
+    a.log("guardrail", "issue_blocked", run_id=env.rid, target="#9", result="blocked", detail={"reasons": ["regex check input"]})
+    d = safety(env.conn, Path("/nonexistent"))
+    assert d["commands_refused"][0]["guard"] == "Shell guard · pip-install"
+    assert d["tools_refused"][0]["guard"] == "Tool allow-list"
+    assert d["issues_blocked"][0]["guard"] == "Injection screen · NeMo regex rail"
+    js = (Path(__file__).parents[1] / "src" / "codepilot" / "dashboard" / "static" / "app.js").read_text()
+    assert '"Guard"' in js and "inline-python" in js                                          # column + rule legend

@@ -171,10 +171,35 @@ def _error_text(detail_json: str | None) -> str:
     return d.get("output_tail") or f"{d.get('type', 'error')}: {d.get('msg', '')}".strip()
 
 
+RAIL_NAMES = {"regex check input": "NeMo regex rail", "self check input": "NeMo self-check rail"}
+
+
+def _guard(action: str, row: dict) -> str:
+    """Which guardrail produced this row (and which rule inside it)."""
+    from codepilot.safety.commands import rule_for
+    try:
+        d = json.loads(row.get("detail_json") or "{}")
+    except ValueError:
+        d = {}
+    if action in ("command_refused", "command_needs_decision"):
+        return "Shell guard · " + (d.get("rule") or rule_for(d.get("reason", "")))
+    if action == "tool_refused":
+        return "Tool allow-list"
+    if action == "issue_blocked":
+        if row.get("result") == "failed_closed":
+            return "Injection screen · unavailable (held back)"
+        rails = [RAIL_NAMES.get(r, r) for r in d.get("reasons", []) if isinstance(r, str)]
+        return "Injection screen" + (" · " + ", ".join(rails) if rails else "")
+    return ""
+
+
 def safety(conn, results_dir: Path) -> dict:
     def rows(action):
-        return [dict(e) for e in conn.execute("select ts, run_id, actor, target, result, detail_json from events "
-                                              "where action=? order by id desc limit 100", (action,))]
+        out = [dict(e) for e in conn.execute("select ts, run_id, actor, target, result, detail_json from events "
+                                             "where action=? order by id desc limit 100", (action,))]
+        for r in out:
+            r["guard"] = _guard(action, r)
+        return out
     g = Path(results_dir) / "guardrail.json"
     return {"commands_refused": rows("command_refused"), "commands_needing_decision": rows("command_needs_decision"),
             "tools_refused": rows("tool_refused"), "issues_blocked": rows("issue_blocked"),

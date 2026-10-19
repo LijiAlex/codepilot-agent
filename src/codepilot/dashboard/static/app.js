@@ -108,6 +108,24 @@ function diffBlock(diff) {
   return pre;
 }
 
+const RULE_HELP = {   // shell-guard rules (src/codepilot/safety/commands.py rule_for)
+  "inline-python": "python -c \"…\": one-line scripts can do anything; use read_file or a test file",
+  "pip-install": "pip / uv / python -m pip|venv: agents never install; CodePilot+ installs from the dependency file",
+  "network": "curl, wget, ssh, gh, http.server: no network from the sandbox",
+  "git-remote": "git push / pull / fetch / remote / clone / config: GitHub is reached only by the publish step after approval",
+  "git-option": "git -C or --output: hides where git acts or writes",
+  "delete-files": "rm, find -delete / -exec: delete or run files only through the file tools",
+  "outside-sandbox": "absolute paths or ../: the agent works inside sandbox/ only",
+  "secret-file": ".env, *.pem, *.key, credentials…: never read or written",
+  "command-substitution": "$( ) and backticks: hide what actually runs",
+  "redirection": "> and <: writes files around the file tools",
+  "multi-line": "newlines: several commands hidden in one call",
+  "background": "a lone &: starts something that keeps running",
+  "blocked-tool": "sudo, chmod, env, sed, awk, perl, node, kill…: never needed in the sandbox",
+  "unknown-command": "not on the allowed or blocked list: a person decides (unexpected-command gate)",
+  "unparseable": "quotes that do not balance",
+};
+
 const render = {
   async overview(m) {
     const [d, audit] = await Promise.all([api("overview"), api("audit").catch(() => ({ events: [] }))]);
@@ -220,16 +238,19 @@ const render = {
   async safety(m) {
     const d = await api("safety");
     const reason = (r) => { try { return JSON.parse(r.detail_json || "{}").reason || ""; } catch (e) { return ""; } };
+    const reasons = (r) => { try { return (JSON.parse(r.detail_json || "{}").reasons || []).join(", "); } catch (e) { return ""; } };
     m.appendChild(el("h2", "Commands refused by the guard"));
     m.appendChild(el("p", "Commands that differ only in spacing are grouped. Every one of them was refused (nothing ran).", "muted"));
     const grouped = {};
     d.commands_refused.forEach(r => { const k = String(r.target || "").trim().replace(/\s+/g, " ");
-      const g = grouped[k] = grouped[k] || { cmd: k, last: r.ts, runs: [], who: new Set(), n: 0, why: reason(r) };
+      const g = grouped[k] = grouped[k] || { cmd: k, last: r.ts, runs: [], who: new Set(), n: 0, why: reason(r), guard: r.guard || "" };
       g.n += 1; g.who.add(actorName(r.actor)); if (r.run_id && !g.runs.includes(r.run_id)) g.runs.push(r.run_id); });
-    m.appendChild(table(["Last seen", "Runs", "Who", "Command", "Times", "Why"], Object.values(grouped).map(g => {
+    m.appendChild(table(["Last seen", "Runs", "Who", "Command", "Times", "Guard", "Why"], Object.values(grouped).map(g => {
       const runs = el("td"); g.runs.forEach((id, i) => { if (i) runs.appendChild(document.createTextNode(", ")); runs.appendChild(runLink(id)); });
-      return [when(g.last), runs, [...g.who].join(", "), td(el("code", g.cmd)), num(g.n), g.why]; })));
-    const sec = (title, rows) => { m.appendChild(el("h2", title)); m.appendChild(table(["When", "Run", "Who", "What", "Why"], rows.map(r => [when(r.ts), td(runLink(r.run_id)), actorName(r.actor), r.target || "", reason(r)]))); };
+      return [when(g.last), runs, [...g.who].join(", "), td(el("code", g.cmd)), num(g.n), g.guard, g.why]; })));
+    const legend = el("details"); legend.appendChild(el("summary", "What each shell-guard rule means"));
+    legend.appendChild(table(["Rule", "Blocks"], Object.entries(RULE_HELP).map(([k, v]) => [k, v]))); m.appendChild(legend);
+    const sec = (title, rows) => { m.appendChild(el("h2", title)); m.appendChild(table(["When", "Run", "Who", "What", "Guard", "Why"], rows.map(r => [when(r.ts), td(runLink(r.run_id)), actorName(r.actor), r.target || "", r.guard || "", reason(r) || reasons(r)]))); };
     sec("Unexpected commands sent to a person", d.commands_needing_decision);
     sec("Tools refused (not on the agent's list)", d.tools_refused); sec("Issues blocked by the injection screen", d.issues_blocked);
     if (d.guardrail_measurement) { const g = d.guardrail_measurement; m.appendChild(el("h2", "Injection screen, measured on labelled issues"));

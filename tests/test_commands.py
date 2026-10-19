@@ -54,3 +54,15 @@ def test_only_push_download_install_refusals_carry_the_publishing_hint():
     assert classify_command("pip install x").hint and classify_command("git push origin main").hint
     assert classify_command("curl http://x").hint and classify_command("python -m pip --version").hint
     assert not classify_command('python -c "1"').hint and not classify_command("rm -rf x").hint
+
+
+@pytest.mark.parametrize("cmd,rule", [
+    ('python -c "import pydantic;print(pydantic.VERSION)"', "inline-python"), ("python -m pip show pydantic", "pip-install"),
+    ("uv add x", "pip-install"), ("curl http://x", "network"), ("git push origin main", "git-remote"), ("rm -rf x", "delete-files"),
+    ("cat ../../.env", "outside-sandbox"), ("cat sandbox/.env", "secret-file"), ("echo $(curl x)", "command-substitution"),
+    ("ls > x", "redirection"), ("echo a\ncurl b", "multi-line"), ("echo a & curl b", "background"), ("sudo ls", "blocked-tool"),
+    ("make test", "unknown-command"),
+])
+def test_every_refusal_names_the_rule_that_fired(cmd, rule):
+    from codepilot.safety.commands import rule_for
+    assert rule_for(classify_command(cmd).reason) == rule

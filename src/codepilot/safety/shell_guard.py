@@ -6,7 +6,7 @@ from langchain_core.messages import ToolMessage
 from langgraph.types import interrupt
 
 from codepilot.audit import AuditLog
-from codepilot.safety.commands import classify_command
+from codepilot.safety.commands import classify_command, rule_for
 
 
 def make_shell_guard(audit: AuditLog, run_id: str, agent: str, approved_commands: frozenset[str] | set[str] = frozenset()):
@@ -18,11 +18,13 @@ def make_shell_guard(audit: AuditLog, run_id: str, agent: str, approved_commands
         cmd = str(call["args"].get("command", ""))
         c = classify_command(cmd)
         if c.kind == "blocked":
-            audit.log(f"agent:{agent}", "command_refused", run_id=run_id, target=cmd, result="refused", detail={"reason": c.reason})
+            audit.log(f"agent:{agent}", "command_refused", run_id=run_id, target=cmd, result="refused",
+                      detail={"reason": c.reason, "rule": rule_for(c.reason)})
             return ToolMessage(content=f"refused by CodePilot+ guard: {c.reason}." + (f" {c.hint}" if c.hint else ""),
                                name="execute", tool_call_id=call["id"], status="error")
         if c.kind == "unknown" and cmd not in approved_commands:
-            audit.log(f"agent:{agent}", "command_needs_decision", run_id=run_id, target=cmd, result="paused", detail={"reason": c.reason})
+            audit.log(f"agent:{agent}", "command_needs_decision", run_id=run_id, target=cmd, result="paused",
+                      detail={"reason": c.reason, "rule": rule_for(c.reason)})
             interrupt({"gate": "unexpected_command", "command": cmd, "agent": agent, "reason": c.reason})
         audit.log(f"agent:{agent}", "command_run", run_id=run_id, target=cmd)
         return handler(request)

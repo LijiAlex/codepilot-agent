@@ -40,3 +40,11 @@ def test_refusal_message_matches_the_reason(tmp_path):
     inline, pip = [m.content for m in out["messages"] if m.type == "tool"]
     assert inline.startswith("refused by CodePilot+ guard: inline python is not allowed") and "install" not in inline
     assert "do not try to push, download or install" in pip
+
+
+def test_refusals_are_logged_with_the_rule_name(tmp_path):
+    import json
+    agent, audit = _agent(tmp_path, [tool_call("execute", {"command": "python -m pip show pydantic"}, "1"), AIMessage(content="ok")])
+    agent.invoke({"messages": [{"role": "user", "content": "x"}]}, {"configurable": {"thread_id": "t"}})
+    row = audit.conn.execute("select detail_json from events where action='command_refused'").fetchone()
+    assert json.loads(row["detail_json"])["rule"] == "pip-install"

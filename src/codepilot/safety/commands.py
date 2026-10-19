@@ -123,3 +123,29 @@ def _explain_unparseable(cmd: str) -> Classification:
         if r.kind == "blocked":
             return r
     return Classification("blocked", "; | or & inside quotes is not supported; run a simpler command")
+
+
+INSTALL_TOOLS = {"pip", "pip3", "npm", "npx", "yarn", "pnpm", "brew", "apt", "apt-get"}
+RULES = [  # (start of the guard's reason, rule name) — first match wins; names are stable for the audit log and dashboard
+    ("command substitution", "command-substitution"), ("redirection", "redirection"), ("multi-line", "multi-line"),
+    ("background commands", "background"), ("path outside the sandbox", "outside-sandbox"), ("secret-like file", "secret-file"),
+    ("inline python", "inline-python"), ("python -m pip", "pip-install"), ("python -m ensurepip", "pip-install"),
+    ("python -m venv", "pip-install"), ("python -m http.server", "network"), ("package changes go through", "pip-install"),
+    ("deleting or running files", "delete-files"), ("unparseable", "unparseable"), ("; | or & inside quotes", "quoted-operators"),
+]
+
+
+def rule_for(reason: str) -> str:
+    """The name of the shell-guard rule behind a refusal (also works for reasons stored before rules had names)."""
+    r = (reason or "").strip()
+    for start, name in RULES:
+        if r.startswith(start):
+            return name
+    if r.startswith("git "):
+        return "git-remote" if r.split()[1] in GIT_BLOCKED else "git-option"
+    if r.endswith("is never needed inside the sandbox"):
+        tool = r.split()[0]
+        return "pip-install" if tool in INSTALL_TOOLS else "network" if tool in NETWORK_OR_INSTALL else "blocked-tool"
+    if r.endswith("is not on the allowed or blocked list") or r.endswith("is not on the allowed list"):
+        return "unknown-command"
+    return "other"
