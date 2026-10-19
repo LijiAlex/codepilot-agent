@@ -1,156 +1,154 @@
 # CodePilot+
 
-CodePilot+ turns GitHub issues labelled `ai-assignable` into tested pull requests. A team of AI agents (built with DeepAgents and LangGraph) explores the repository, changes the code in an isolated sandbox, runs the tests and drafts the pull request; a person approves every change in a terminal UI before anything reaches GitHub. Tags used below: **Brief** = required by the assignment, **Bonus** = the assignment's bonus list, **Plus** = added by CodePilot+.
+**An AI coding agent that picks up GitHub issues, fixes them in a sandbox, tests the fix, and opens a pull request — but only after a person approves it.**
 
-## Demo
+Engineering teams lose hours every sprint to small, well-defined issues: a bug flagged by a test, a dependency bump, a missing paragraph in the docs. CodePilot+ takes those off the queue. You label an issue `ai-assignable`; a team of AI agents reads it, finds the relevant code, makes the change in an isolated copy of the repository, runs the tests, and prepares a pull request. Nothing reaches GitHub until you approve it in the terminal.
 
-FILL: YouTube (unlisted) link to the ~7-minute demo, then the TUI GIF (under 5 MB): `![CodePilot+ TUI](docs/tui.gif)`.
+FILL: demo video link (5–7 minutes)
 
-## Setup
-
-    uv tool install git+https://github.com/LijiAlex/codepilot-agent
-    cp codepilot.example.yml codepilot.yml        # list your repositories, test and install commands
-    export ANTHROPIC_API_KEY=...                   # solver model
-    export CODEPILOT_GH_APP_ID=... CODEPILOT_GH_APP_KEY_PATH=~/.codepilot/keys/app.pem
-    export DAYTONA_API_KEY=...                     # remote sandbox (or set `sandbox: local`)
-    # optional: `injection_checker: bedrock` + AWS_PROFILE to screen issues with an AWS Bedrock guardrail instead of NeMo
-    codepilot selfcheck && codepilot
-
-GitHub App permissions: Contents, Pull requests and Issues read & write; Metadata read; no Workflows. FILL: anything that changed during the build.
-
-## Architecture
-
-One Python process: the TUI on the main thread, with background threads for the poller and PR watcher, the worker (one run at a time) and decisions, all sharing one SQLite database. Each run gets its own Daytona box, cloned from a git bundle (no GitHub credential inside), deleted when the run ends.
-
-```mermaid
-flowchart LR
-  GH[(GitHub issues / PRs)] -- Toolkit reads --> P[Poller + PR watcher]
-  P -- sanitise + injection check --> DB[(SQLite: runs, handoffs, audit)]
-  DB --> W[Worker]
-  W -- triage --> O[Orchestrator]
-  O --> E[Repo Explorer] & C[Coder] & PA[PR Agent]
-  C --> T[Test Agent] & TD[Test doctor]
-  O & E & C & T --> BOX[[Daytona box per run]]
-  W -- decision point --> H[Handoff]
-  H --> TUI[TUI: Human Approval]
-  TUI -- approve --> PUB[Publish: re-check, fixed tools] -- one commit + PR --> GH
-  W --> MEM[(Memory: working / episodes / lessons)]
-```
+FILL: `![CodePilot+ in the terminal](docs/tui.gif)`
 
 ## How it works
 
-1. **Poll (Brief)** every 5 minutes through the GitHub Toolkit; skip issues already in progress, failed recently or already on a branch; sanitise and screen the text (Brief guardrails: NeMo Guardrails input rails).
-2. **Triage (Brief, Bonus complexity score)**: one of five task types picks a skill; above the threshold a read-only plan goes to the TUI first (Plus).
-3. **Explore → code → test (Brief)**: Repo Explorer (repo map + keyword/embedding search) → Coder → Test Agent, in a fresh sandbox with no credentials.
-4. **Gates (Brief)**: nothing waits on a person — a decision becomes a TUI item and the run ends (Plus).
-5. **Publish (Brief)**: after approval, code re-checks the issue and `main`, then the PR Agent opens one commit and one PR with labels and a review request.
-6. **Memory (Brief)**: working state per run, episodes per session, lessons from merged PRs (Plus: also from failures and rejections).
+```mermaid
+flowchart LR
+  I[GitHub issue<br/>labelled ai-assignable] --> S[Safety screen]
+  S --> T[Triage: what kind of task?]
+  T --> A[Agents explore, code, test<br/>in a sandbox]
+  A --> H{You approve<br/>in the terminal}
+  H -- yes --> PR[Pull request on GitHub]
+  PR --> R[Independent AI review]
+  PR -- merged --> M[Lesson saved to memory]
+```
 
-## Example pull request
+1. **Watch.** Every 5 minutes CodePilot+ checks your repositories for open issues labelled `ai-assignable`.
+2. **Screen.** The issue text is cleaned and checked for prompt injection (instructions hidden in an issue to trick the AI) before any agent reads it.
+3. **Triage.** The issue is sorted into one of five task types — bug fix, feature, dependency update, documentation, configuration — and given a complexity score. The type decides which playbook (a *skill*) the agents follow. Issues that look too complex get a written plan for you to approve instead of code.
+4. **Solve.** A team of agents works in a fresh sandbox (a throw-away copy of the repository on a remote machine, with no GitHub access): one maps the repository and finds the relevant files, one writes the change, one writes and runs tests.
+5. **Approve.** When the change is ready — or when the agents want to do something unusual — the run saves its work and the item appears in the terminal's approval panel. You inspect the diff and approve or reject. Nothing waits idle in the meantime.
+6. **Publish.** After approval, CodePilot+ re-checks the issue and the main branch, then commits exactly the approved change and opens one pull request, labelled and linked to the issue.
+7. **Learn.** A separate AI reviewer scores every pull request. When a pull request is merged, CodePilot+ saves a short lesson it can recall the next time it meets a similar issue.
 
-FILL: link to a merged CodePilot+ PR on `layered-memory` and one on `codepilot-playground`.
+## What's inside
 
-## Guardrails
+**The agent team.** Built with [DeepAgents](https://github.com/langchain-ai/deepagents) on LangGraph. An Orchestrator plans each task as a checklist and hands work to a Repo Explorer, a Coder, a Test Agent and a PR Agent. Each agent gets only the tools it needs; the list is checked every time the app starts.
 
-Issue text passes two layers before any agent sees it: the sanitiser (removes HTML comments, hidden characters, link titles, image alt text) and **NeMo Guardrails** input rails — a regex rail for unambiguous attacks (no model call) and the LLM self-check rail (`guardrails/nemo/config.yml`). If the screen cannot answer, the issue is held back (fails closed).
+**Context that fits.** A real repository does not fit in a model's context window. CodePilot+ builds a *repo map* — the folder tree plus a one-line summary and the main functions of each file — ranked by relevance and cut to a 4,000-token budget. Agents read files only when they need them. On Django (7,084 files) the map is 3,978 tokens.
 
-Measured on 27 labelled issues (`evals/issues.yaml`; the benign ones are deliberately code-heavy — stack traces, shell snippets, the words "ignore", "override", "delete"):
+**Safety.** Several independent layers:
+- Issue text is cleaned (hidden comments, invisible characters) and screened by [NeMo Guardrails](https://github.com/NVIDIA/NeMo-Guardrails); if the screen cannot answer, the issue is held back.
+- Every shell command an agent runs is checked first. Commands that are never needed (`rm -rf`, `curl`, `pip install`, `git push`, reading `.env`) are refused with a reason; commands nobody has classified are paused for you to decide.
+- Agents can only write inside the sandbox, and never to secret files.
+- Your approval is required to open a pull request, for any change touching more than 5 files, and before a third attempt after tests fail twice.
 
-| Measure | Result |
-|---|---|
-| Malicious issues blocked by NeMo | 10/12 (the other 2 hid their payload in an HTML comment and a link title, which the sanitiser had already removed — 12/12 never reach an agent) |
-| Benign issues wrongly blocked | 0/15 |
-| Screen unavailable (failed closed) | 0 |
-| Latency p50 / p95 | 828 ms / 1258 ms |
+**Memory.** Three kinds, as people have:
+- *Working memory* — the current task's state, shared between the agents and cleared when the task ends.
+- *Session memory* — a summary of each session, read at start-up so recently failed issues are not retried straight away.
+- *Lessons* — what worked (from merged pull requests) and what went wrong (from failures and rejections), stored per repository and task type and recalled for similar issues.
 
-FILL: the scoreboard rows for refused commands and unexpected-command decisions (`scripts/scoreboard.py`).
+**It improves itself — with your sign-off.** After each run, CodePilot+ looks at what slowed the agents down (a refused command, a file they could not find) and proposes a change to that repository's own skill notes — add, correct or retire one step, never a rewrite. Proposals that keep coming back gain confidence; none take effect until you approve them on the dashboard.
 
-## Evaluation
+**An independent reviewer.** A GitHub Action reviews every pull request — CodePilot+'s and people's — with a different AI model from a different company, so the system never grades its own work. It scores five criteria (correctness, tests, matches the issue, risk, scope), comments on specific lines, and labels the pull request `merge-ready` only when the score, the tests and the merge policy all agree. Pull requests from forks are reviewed from the diff alone; their code is never run.
 
-One command scores the whole system and gives one verdict: `scripts/with-env python scripts/evaluate.py --python <playground python>`.
-It writes `results/eval.md` and `results/eval.json`, and the dashboard's **Evaluation** page shows the same report.
+**A dashboard.** A local web page for everything the terminal does not show: every run and the stages it reached, open pull requests with their reviews (merge or close from there), every refused command and the rule behind it, memory and skills, the evaluation report, cost per run, and a complete audit log of who did what.
 
-| Layer | What it is | Model? |
-|---|---|---|
-| Rule checks | 13 checks on every run: branch name, commit format, `Closes #N`, PR sections and labels, tests passed after the last change, at most 5 files or flagged, no protected paths, no secret in the diff, no refused command retried, correct skill loaded, repo map within budget. Each is pass, fail or n/a; n/a never counts as a pass. The PR rules call the same validators the publisher uses. | no |
-| Golden issues | `playground/issues.yaml`: 14 issues, each with the outcome CodePilot+ should reach (PR, plan, decision, guardrail block, refused command). | no |
-| Hidden tests | Each PR's fail-to-pass test is never shown to the agents; it is added to the PR's code afterwards and run. | no |
-| Judge | The independent reviewer's rubric (5 criteria, 0–2 each). The agents run on Claude and the reviewer on an OpenAI model, so the system never grades its own work. | yes |
-| Judge probes | Four fixed pull requests: a test deleted to make the suite pass, a change unrelated to the issue, a hard-coded key (all must score below the merge line), and a correct fix (must clear it). A judge that has never been shown a bad answer has not been shown to work. | yes, 4 calls |
-| Injection screen | The 27 labelled issues in `evals/issues.yaml` (see Guardrails). | yes |
-
-Rules carried over from my Assignment 3 evaluation pipeline: deterministic signals have a fixed bar; model-scored and sample-dependent ones are judged against the figure they last recorded, less 0.05 (`--set-baseline`, never automatic), and a baseline over a different number of cases reads `incomparable` rather than FAIL. A signal that could not run reads `unavailable` and never fails the verdict. Triage agreement with the golden labels is reported as accuracy, not as a rule, because choosing a task type is a judgement call.
-
-FILL: paste the Signals table from `results/eval.md` after batch 2.
+FILL: `![Dashboard overview](docs/dashboard.png)`
 
 ## Results
 
-FILL: `scripts/scoreboard.py` output (tokens and minutes per issue are on the dashboard's Runs page).
+FILL: one sentence on what was run (number of issues across the two test repositories) and the verdict from `results/eval.md`.
 
-Context engineering (FILL from the dashboard's Context page and `scripts/map_proof.py`): repo map tokens vs the 4,000 budget, files shown, top-K = 10 files returned by the Explorer, files read before the right one, lessons recalled per run, and the large-repository proof (Django: 7,084 files → 3,978 tokens).
+FILL: the signals table from `results/eval.md`.
 
-## Observability
+The evaluation combines:
 
-FILL: `![LangSmith trace](docs/langsmith.png)` — one run's trace (Orchestrator → Explorer → Coder → Test Agent → PR Agent); inputs and outputs are redacted before upload. Every action is also in the local audit log (`codepilot dashboard` → Audit).
+| Part | What it checks | Uses an AI model? |
+|---|---|---|
+| Rule checks | 13 checks on every run: branch name, commit format, pull request description and labels, tests passed after the last change, files touched, no secrets in the diff, no refused command tried again, right skill loaded, repo map within budget | no |
+| Test issues with known outcomes | 14 issues written in advance, each with the outcome CodePilot+ should reach — a pull request, a plan, a question for you, or a refusal | no |
+| Hidden tests | For each pull request, a test the agents never saw is added to its code afterwards and must pass | no |
+| AI judge | The independent reviewer's score on CodePilot+'s pull requests | yes |
+| Judge self-test | Four fixed pull requests the judge must get right: three bad ones (a test deleted to make the suite pass, a change unrelated to the issue, a hard-coded key) and one good one | yes |
+| Injection screen | 27 labelled issue texts, 12 of them attacks | yes |
 
-## Key design decisions
+Injection screen on the 27 labelled issues — the harmless ones are deliberately code-heavy (stack traces, shell snippets, words like "ignore" and "delete"), because those are the likely false alarms:
 
-- Handoffs instead of waiting: a run never holds a sandbox while a person decides.
-- Fixed publish tools: the commit is built from the exact approved change; the agent supplies only text.
-- Per-agent tool lists and write permissions, checked at every start-up.
-- Remote sandbox per run, cloned from a git bundle: no GitHub credential ever enters it.
-- A change counts as tested only if the last `verify` test run came after the last edit; a passing "reproduce" run never counts.
-- A decision interrupted by a shutdown (e.g. mid-publish) is put back in the approval list at start-up; re-approving is safe because the publish tools are idempotent.
-- Untrusted issue text is never rendered as markup in the TUI and never as HTML in the dashboard.
-- The dashboard merges only when the latest independent review is for the current commit and says merge-ready.
+| Measure | Result |
+|---|---|
+| Attacks blocked by the screen | 10 of 12 (the other 2 hid their payload in places the cleaning step removes first, so none of the 12 reach an agent) |
+| Harmless issues wrongly blocked | 0 of 15 |
+| Median / slow (95th percentile) check time | 0.8 s / 1.3 s |
+
+FILL: example pull requests — one merged on `layered-memory`, one on `codepilot-playground`.
+
+FILL: `![One run traced in LangSmith](docs/langsmith.png)` — one run from Orchestrator to PR Agent; inputs and outputs are redacted before upload.
+
+## Try it
+
+**You need:** Python 3.12, [uv](https://docs.astral.sh/uv/), a GitHub App installed on your repositories (permissions: Contents, Pull requests and Issues read & write; Metadata read), an Anthropic API key, and a [Daytona](https://www.daytona.io/) key for the sandbox (or `sandbox: local` for a weaker local sandbox on macOS). Optional: a LangSmith key for tracing, an OpenAI key for the independent reviewer.
+
+```bash
+git clone https://github.com/LijiAlex/codepilot-agent && cd codepilot-agent
+cp .env.example .env                       # fill in your keys
+cp codepilot.example.yml codepilot.yml     # list your repositories and their test commands
+scripts/with-env codepilot connect OWNER/REPO --write   # labels, setup check, repo map, skill notes
+scripts/with-env codepilot selfcheck       # every agent has exactly its intended tools
+scripts/with-env codepilot                 # the terminal app
+scripts/with-env codepilot dashboard       # the dashboard; open the link it prints
+```
+
+`scripts/with-env` loads `.env` into the command's environment; CodePilot+ itself never reads the file.
+
+In the terminal app: label an issue `ai-assignable` and wait for the next check (shown in the issues panel title), or press `i` to type a task yourself. Approve with `a`, reject with `r`, inspect with `v`, skip an issue with `s`, open the full log with `l`, quit with `q`.
+
+To add the independent reviewer to a repository: `uv run python scripts/install_reviewer.py --repo OWNER/REPO --install "pip install -e . pytest" --create`, then add the secrets `OPENAI_API_KEY` and `REVIEWER_APP_KEY` and the variables `REVIEWER_APP_ID`, `REVIEWER_LOGIN` and `CODEPILOT_LOGIN` in the repository's settings.
+
+Run the tests: `uv run pytest` (FILL: test count).
+
+## Design choices
+
+- **Nobody waits.** When a person's decision is needed, the run saves its work and ends; your decision starts a new run from where it stopped. No sandbox sits idle while you are away.
+- **The agents never touch GitHub directly.** They draft the commit message and pull request text; the commit itself is built by code from exactly the change you approved.
+- **No credentials in the sandbox.** The repository is copied into it without any GitHub token, so a misbehaving agent has nothing to push with.
+- **"Tested" means tested after the last edit.** A passing test run before a later change does not count.
+- **Untrusted text stays text.** Issue and pull request text is never rendered as formatting in the terminal or as HTML on the dashboard.
+- **Approvals cover what you approved.** Approving a command (for example `make lint`) allows that command for the rest of the run — nothing broader, and never a blocked one.
 
 ## Known limitations
 
-- Daytona's free tier cannot block outbound network traffic; the sandbox holds no credentials and the shell guard refuses network tools, but egress itself is open (measured 2026-10-17 on a live box: outbound reachable; box start-up 9.6 s).
-- The local fallback sandbox (macOS `sandbox-exec`: no network, no writes outside the run, CodePilot+'s own files unreadable) is weaker than a remote box.
-- The command guard is a policy filter, not the security boundary: `python` and `pytest` run repository code by design, so the sandbox is the boundary.
-- The Independent Reviewer reviews pull requests from forks without running their code, so a fork PR is never merge-ready (its tests are reported as not run); for other PRs its "tests green" signal comes from a job that runs the PR's own code.
-- LangSmith keeps traces 14 days; README screenshots stand in for links.
-- If `main` changed 300 or more files since the run started, GitHub's compare API cannot list them all, so publishing is refused as a possible conflict.
-- Claude Sonnet 5.5 accepts only the default sampling temperature, so runs are not deterministic.
+- The remote sandbox can reach the internet on the current Daytona plan. The command check refuses network tools and the sandbox holds no credentials, but outbound traffic itself is not blocked.
+- The local sandbox (macOS only) is weaker than the remote one.
+- The command check is a filter, not the security boundary: running the project's own tests runs its code by design, so the sandbox is the boundary.
+- Runs are not repeatable: the model does not support a fixed sampling temperature, so the same issue can be handled differently twice.
+- LangSmith keeps traces for 14 days; the screenshot stands in for a link.
 
 ## Future improvements
 
-Ideas that came up while building and testing, deliberately left out of this version:
+- **Share lessons across repositories.** When the same lesson has been approved for two or more repositories, propose it for the general playbook — additions only, with their own approval.
+- **Steadier triage.** Remember an issue's first classification, or classify twice and take the majority, so retries are consistent.
+- **Block outbound network in the sandbox** with a paid sandbox tier or an allow-list.
+- **Spending limits in dollars** per run and per day (runs are already bounded by model calls, tool calls and time).
+- **Run tests for fork pull requests** in a separate sandbox with no secrets, so the reviewer can score them fully.
 
-- **Promote lessons from repo skills to task skills.** Task skills (the five playbooks) stay generic and fixed; everything repository-specific lives in each repo skill. A safe next step: when the same gotcha has been approved in the repo skills of at least two repositories (for example "inline `python -c` is refused — read the file instead"), propose it as an addition to the matching task skill. Additions only — a learned change may never remove or soften a "Must not" rule or the workflow steps — with its own approval and versions.
-- **Current repo skill view.** The Skills tab lists each version's change; it could also show the full text the agents read for any version, with the steps each version added or retired, and its size against the 1,500-token budget.
-- **Smarter merging of skill proposals.** Reworded proposals are merged by meaning (local embeddings) plus a shared file or command; an extra model check on borderline pairs (merge / keep both) would cut the rare wrong merge.
-- **Tests for fork pull requests.** Fork PRs are reviewed from the diff only and their code is never run, so they are never marked merge-ready automatically. Running their tests in a separate throw-away sandbox with no secrets would let the reviewer score them fully.
-- **Steadier triage.** The same issue can be classified differently on different runs (for example bug fix one time, feature addition the next). Remembering the first classification per issue, or asking twice and taking the majority, would make retries consistent.
-- **Blocking outbound network in the sandbox.** The shell guard refuses network tools, but the remote box itself can reach the internet on the current plan; a paid sandbox tier or an egress allow-list would close that.
-- **Cost limits per run in dollars.** Runs are bounded by model calls, tool calls and minutes; LangSmith already prices every call, so a dollar ceiling per run (and per day) is a small step.
-- **Pull request page extras.** CI status from GitHub, sorting, and a direct "re-review" button that adds the `codepilot-review-pending` label.
+## For reviewers: the assignment brief
 
-## Brief vs CodePilot+
+CodePilot+ was built for the AI Engineering Bootcamp capstone brief *Multi-Agent Coding Platform (CodePilot)*. Every requirement is implemented; the table lists where the implementation deliberately differs and why.
 
-| Brief | CodePilot+ | Why |
+| The brief asks for | CodePilot+ does | Why |
 |---|---|---|
-| Approval panel waits for a keypress | Item waits; agent saves work and moves on (handoff) | No idle sandbox/agent; nothing goes stale |
-| Ask before `git push`; ask a person on every blocked command | Push refused and logged; the only route to GitHub is the publish step, which always needs approval. Known never-needed commands are refused without interrupting anyone; only unexpected commands ask a person | Fewer interruptions, same protection; the sandbox has no GitHub access |
-| PR Agent commits/opens PR with Toolkit `create_*` | PR Agent opens the PR after approval, using fixed tools that replace the Toolkit write tools | Toolkit commits one file per call, has no labels, and its tool names are rejected by AI providers |
-| NeMo Guardrails | NeMo Guardrails input rails (regex + LLM self-check on Claude Haiku) screen issue text; custom Python guards commands, file writes and the change set | As the brief asks; the self-check model needed a small adapter because Claude 5 models reject NeMo's fixed `temperature` |
-| Local sandbox, repo subset | Daytona, full clone; local fallback | Local backend has no isolation; tests need whole repo |
-| `Permission(path, access)`, `summarization=True` | `FilesystemPermission(operations, paths, mode)`; summarisation always on | Real 0.7.23 API |
-| Subagents spawn subagents | Coder is a compiled deep agent | Declarative subagents get no `task` tool |
-| GitHubToolkit (langchain-community) | Used for read tools only | langchain-community prints "being sunset, no longer actively maintained" (0.4.2) |
-| Triage inside Orchestrator | Orchestrator's classification step runs before the graph is built | Graph is built for the chosen skill/subagents |
+| The approval panel waits for a keypress | The item waits; the run saves its work and ends | No idle sandbox or agent while a person is away |
+| Ask a person before `git push` and on every blocked command | `git push` is refused (the only way to GitHub is the approved publish step); never-needed commands are refused with a reason; only unclassified commands ask a person | Same protection, far fewer interruptions |
+| The PR Agent commits with the GitHub Toolkit's write tools | The PR Agent drafts the text; fixed tools open one commit and one pull request after approval | The Toolkit commits one file per call, cannot add labels, and its tool names are rejected by AI providers |
+| A local sandbox holding part of the repository | A remote Daytona sandbox per run with the whole repository; a local sandbox as fallback | The local option has no real isolation, and tests need the whole repository |
+| The Orchestrator polls GitHub itself | Polling runs in plain code; the Orchestrator sees only the issue it claimed | Cheaper, and untrusted issues reach no agent before screening |
+| Subagents spawn subagents | The Coder is a full agent that runs the Test Agent | DeepAgents gives simple subagents no way to spawn others |
+| Skills through `deepagents.skills` | Skills are structured files (name, instructions, workflow steps, example prompts, forbidden actions) loaded by CodePilot+ | Needed the brief's structured fields and per-task selection |
+| The GitHub Toolkit (`langchain-community`) | Used for reading issues only | The package warns it is no longer actively maintained |
+| The diff preview in `working/proposed_diff.txt` | In `/shared/proposed_diff.txt`, the agents' shared working folder | Same folder as the repo map and task state |
+| Skip issues above the complexity threshold (bonus) | Labelled issues above it get a plan for you to approve; unlabelled ones are skipped | A person asked for the work, so a plan is more useful than silence |
 
-Also:
-- Polling with the Toolkit runs in plain code, not inside the Orchestrator agent (cheaper; the agent only sees its claimed issue).
-- Skills are structured objects loaded by CodePilot+ (`codepilot:` front matter) rather than mounted through `deepagents.skills`.
-- Labelled issues above the complexity threshold get a plan for a person to approve instead of being skipped; unassigned ones above it are skipped (brief bonus).
-- "In-progress issue IDs" are database claims (one active run per issue), shared by every thread.
-- The repo map is built by code at run start and written to `/shared/repo_map.md` (the agents' virtual file system), not by the Explorer with `write_file`.
-- The diff preview is written to `/shared/proposed_diff.txt` (the same working folder as the repo map and task state), not `working/proposed_diff.txt`.
-- Blocked commands are refused with a reason, not escalated; only commands nobody has classified go to a person.
-- Lint-on-edit uses `py_compile`; the repo map's LLM file descriptions are off; a release regex scan replaces gitleaks.
+Bonus items done: self-healing tests (a test-doctor agent fixes broken test setup once), complexity scoring, LangSmith tracing, and the Daytona cloud sandbox.
 
 ## Credits
 
-Injection guardrail: my Assignment 3 project, used as a package (`guardrail-eval-pipeline` v0.2.0). Playground: a copy of that project with planted defects. Built with DeepAgents, LangGraph, LangChain, Textual, ChromaDB, PyGithub and Daytona.
+The issue screen reuses my earlier bootcamp project, [guardrail-eval-pipeline](FILL: link), as a package; the test repository `codepilot-playground` is a copy of it with deliberately planted defects. Built with DeepAgents, LangGraph, LangChain, NeMo Guardrails, Textual, ChromaDB, PyGithub and Daytona.

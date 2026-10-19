@@ -10,10 +10,10 @@ repos:
     name: codepilot-playground
     test_command: "python -m pytest -q"
     install_command: "pip install -e . pytest"
-    protected_paths: ["tests/test_contract_*.py"]        # the retry-gate contract test (Task 23)
+    protected_paths: ["tests/test_contract_*.py"]        # files agents must never change
     author_allowlist: [LijiAlex]
 poll_interval_s: 300
-max_model_calls_per_run: 60      # per agent invocation; keeps one live run's spend bounded (Task 26 Step 8 checks the budget)
+max_model_calls_per_run: 60      # per agent invocation; keeps one run's spend bounded
 max_tool_calls_per_run: 200
 complexity_threshold: 6
 solver_model: "anthropic:claude-sonnet-5-5"
