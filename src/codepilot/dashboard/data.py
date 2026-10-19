@@ -182,7 +182,11 @@ def _guard(action: str, row: dict) -> str:
     except ValueError:
         d = {}
     if action in ("command_refused", "command_needs_decision"):
-        return "Shell guard · " + (d.get("rule") or rule_for(d.get("reason", "")))
+        if d.get("rule"):
+            return "Shell guard · " + d["rule"]
+        from codepilot.safety.commands import classify_command
+        now = classify_command(row.get("target") or "")            # rows saved before rules had names: ask today's guard
+        return "Shell guard · " + rule_for(now.reason if now.kind != "allowed" else d.get("reason", ""))
     if action == "tool_refused":
         return "Tool allow-list"
     if action == "issue_blocked":

@@ -478,3 +478,11 @@ def test_safety_rows_name_the_guard_and_rule(env):
     assert d["issues_blocked"][0]["guard"] == "Injection screen · NeMo regex rail"
     js = (Path(__file__).parents[1] / "src" / "codepilot" / "dashboard" / "static" / "app.js").read_text()
     assert '"Guard"' in js and "inline-python" in js                                          # column + rule legend
+
+
+def test_old_unparseable_rows_show_the_real_rule(env):
+    from codepilot.audit import AuditLog
+    from codepilot.dashboard.data import safety
+    AuditLog(env.conn).log("agent:coder", "command_refused", run_id=env.rid, target='python -c "import a;print(a)"',
+                           result="refused", detail={"reason": "unparseable command"})          # saved by the old guard
+    assert safety(env.conn, Path("/nonexistent"))["commands_refused"][0]["guard"] == "Shell guard · inline-python"
