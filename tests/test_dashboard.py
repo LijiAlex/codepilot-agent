@@ -229,7 +229,7 @@ def test_friendly_summary_handles_nested_brackets_and_newlines():
         grab("status") + "\n" + grab("friendlySummary") + "\n" + \
         "console.log(friendlySummary('FAILED(setup: box command failed (1): cd …\\nObtaining file:///x\\n  Checking if build backen): 1 | PR_OPENED: 2'))"
     out = subprocess.run(["node", "-e", prog], capture_output=True, text=True, check=True).stdout.strip()
-    assert out.startswith("failed (setup: box command failed (1): cd") and out.endswith("×1 | PR opened ×2") and "FAILED" not in out
+    assert out.startswith("Failed (setup: box command failed (1): cd")   # status() uses sentence case and out.endswith("×1 | PR opened ×2") and "FAILED" not in out
 
 
 def test_cost_comes_from_langsmith_traces_matched_by_run_id(env):
@@ -418,3 +418,33 @@ def test_audit_links_pr_rows_to_the_run_that_opened_the_pr(env):
     AuditLog(env.conn).log("human:dashboard", "pr_merge", target="o/r#3", detail={"merged": True})
     ev = env.client.get("/api/audit", headers=H).json()["events"][0]
     assert ev["action"] == "pr_merge" and ev["run_id"] is None and ev["linked_run"] == env.rid
+
+
+RUBRIC_BODY = ("### Independent review\n\nAdds the section.\n\n**Score:** 6/10 · **Review effort:** 1/5 (capped at 6: tests not run)\n"
+               "**Matches the issue:** Yes.\n"
+               "**Rubric:** correctness 2/2 · tests 1/2 · matches the issue 2/2 · risk 2/2 · scope 1/2\n"
+               "- correctness: the example runs as written\n- tests: no test covers the README\n- matches the issue: adds the asked section\n"
+               "- risk: docs only\n- scope: also reflows an unrelated paragraph\n\n**Merge-ready:** no — fork PR: tests not run; needs a human approval\n\n"
+               "<sub>Reviewed by the CodePilot+ Independent Reviewer. It never merges.</sub>")
+
+
+def test_rubric_points_reasons_and_cap_are_parsed():
+    f = parse(RUBRIC_BODY)
+    assert (f["score"], f["effort"], f["cap"]) == (6, 1, "capped at 6: tests not run")
+    assert f["rubric"] == {"correctness": 2, "tests": 1, "matches the issue": 2, "risk": 2, "scope": 1}
+    assert f["rubric_reasons"]["scope"] == "also reflows an unrelated paragraph" and f["matches"] == "Yes."
+    assert parse(REAL_PR15_BODY)["rubric"] == {} and parse(REAL_PR15_BODY)["cap"] == ""        # older reviews have no rubric
+
+
+def test_page_has_the_qa_review_improvements():
+    static = Path(__file__).parents[1] / "src" / "codepilot" / "dashboard" / "static"
+    js, css = (static / "app.js").read_text(), (static / "style.css").read_text()
+    assert "Skills at a glance" in js and "Recent activity" in js and "Success rate" in js and "cardLink" in js   # overview
+    assert '"PR review")' in js and '"Review cost"' in js and "rubricCell" in js and "No open pull requests" in js  # reviewer + PRs
+    assert "older" in js and "Never reached" in js and "duration(" in js and "filterInput" in js                  # runs
+    assert "logRows" in js and "toLocaleTimeString" in js and "Jump to the diff" in js                             # run detail
+    assert "Commands that differ only in spacing are grouped" in js and '"What", "Result"' not in js
+    assert "person (dashboard)" in js and "Older →" in js and "linked_run" in js                                  # audit
+    assert "Past decisions" in js and 'el("summary", "evidence")' in js                                          # improvements
+    assert "Last refreshed" in js and "Auto-refresh" in js and js.count("local time") == 1                        # header, once
+    assert "--link" in css and "@keyframes spin" in css
