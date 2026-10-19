@@ -256,3 +256,19 @@ def test_dashboard_uses_trace_costs_when_available_and_survives_langsmith_errors
     def down(): raise RuntimeError("langsmith unreachable")
     bad = TestClient(create_app(DashboardDeps(**base, trace_costs=down), TOKEN, PORT))
     assert bad.get("/api/overview", headers=H).json()["cost_usd"] is None      # page still loads
+
+
+def test_usage_from_langsmith_splits_agents_screen_and_reviewer(env):
+    from codepilot.dashboard import data
+    class FakeLS:
+        def list_runs(self, project_name, is_root, limit):
+            if project_name == "codepilot-plus":
+                return [NS(extra={"metadata": {"run_id": env.rid}}, total_cost=0.2, prompt_tokens=1000, completion_tokens=50),
+                        NS(extra={"metadata": {"kind": "injection-screen"}}, total_cost=0.001, prompt_tokens=300, completion_tokens=2)]
+            return [NS(extra={"metadata": {"pr": 14}}, total_cost=0.05, prompt_tokens=4000, completion_tokens=400)]
+    u = data.langsmith_usage(FakeLS(), "codepilot-plus", "codepilot-reviewer")
+    assert u["runs"][env.rid] == {"cost": 0.2, "tokens_in": 1000, "tokens_out": 50}
+    assert u["screen"] == {"cost": 0.001, "tokens_in": 300, "tokens_out": 2}
+    assert u["reviewer"] == {"cost": 0.05, "tokens_in": 4000, "tokens_out": 400}
+    ov = data.overview(env.conn, trace_usage=u)
+    assert ov["usage"]["reviewer"]["cost"] == 0.05 and ov["cost_usd"] == 0.25 and ov["cost_source"] == "LangSmith"

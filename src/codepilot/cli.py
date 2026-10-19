@@ -38,6 +38,22 @@ def trace_cost_source(project: str):
     return costs
 
 
+def trace_usage_source(project: str, reviewer_project: str = "codepilot-reviewer"):
+    """Tokens and cost per run, injection screen and reviewer from LangSmith, cached for a minute."""
+    if not os.environ.get("LANGSMITH_API_KEY"):
+        return None
+    import time
+    from langsmith import Client
+    from codepilot.dashboard.data import langsmith_usage
+    client, cache = Client(), {"at": 0.0, "usage": None}
+
+    def usage() -> dict:
+        if cache["usage"] is None or time.monotonic() - cache["at"] > 60:
+            cache["usage"], cache["at"] = langsmith_usage(client, project, reviewer_project), time.monotonic()
+        return cache["usage"]
+    return usage
+
+
 def dashboard_token(home: Path) -> str:
     """One access token per CodePilot+ home, kept in a file only the user can read, so a restart does not lock out
     an open tab. Delete the file to issue a new one."""
@@ -63,7 +79,7 @@ def start_dashboard_thread(engine, settings, config_dir: Path, port: int):
     from codepilot.skills import load_skills
     s = engine.worker.s
     improver = getattr(engine, "improver", None)
-    deps = DashboardDeps(trace_costs=trace_cost_source(settings.langsmith_project), map_budget=settings.repo_map_budget_tokens, cost_tracked=settings.price_in_per_mtok is not None and settings.price_out_per_mtok is not None, conn=s.runs.conn, runs_dir=Path(settings.home) / "runs", results_dir=config_dir / "results",
+    deps = DashboardDeps(trace_usage=trace_usage_source(settings.langsmith_project), trace_costs=trace_cost_source(settings.langsmith_project), map_budget=settings.repo_map_budget_tokens, cost_tracked=settings.price_in_per_mtok is not None and settings.price_out_per_mtok is not None, conn=s.runs.conn, runs_dir=Path(settings.home) / "runs", results_dir=config_dir / "results",
                          repos=[r.full_name for r in settings.repos], repo_factory=engine.cs.publish.repo_factory, audit=s.audit,
                          reviewer_login=settings.reviewer_login, lessons=s.lessons, episodic=s.episodic, skills=load_skills(),
                          improvements=improver.store if improver is not None else None)
@@ -155,7 +171,7 @@ def cmd_dashboard(args) -> int:
         owner, name = full_name.split("/")
         return TokenProvider.from_env(s.github_app_id_env, s.github_app_key_path_env, owner, name)
 
-    deps = DashboardDeps(trace_costs=trace_cost_source(s.langsmith_project), map_budget=s.repo_map_budget_tokens, cost_tracked=s.price_in_per_mtok is not None and s.price_out_per_mtok is not None, conn=conn, runs_dir=home / "runs", results_dir=path.parent / "results", repos=[r.full_name for r in s.repos],
+    deps = DashboardDeps(trace_usage=trace_usage_source(s.langsmith_project), trace_costs=trace_cost_source(s.langsmith_project), map_budget=s.repo_map_budget_tokens, cost_tracked=s.price_in_per_mtok is not None and s.price_out_per_mtok is not None, conn=conn, runs_dir=home / "runs", results_dir=path.parent / "results", repos=[r.full_name for r in s.repos],
                          repo_factory=lambda n: tokens(n).repo(), audit=AuditLog(conn), reviewer_login=s.reviewer_login,
                          # standalone: no ChromaDB (one process per Chroma folder); lessons show with `codepilot --dashboard PORT`
                          lessons=None, episodic=EpisodicMemory(home / "store.db"),

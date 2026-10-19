@@ -56,7 +56,7 @@ class StaticInjectionChecker:
         return InjectionVerdict(blocked=bool(hits), reasons=hits)
 
 
-def guardrail_llm(name: str):
+def guardrail_llm(name: str, callbacks: list | None = None):
     """A Claude chat model for the self-check rail. NeMo always sends `temperature` (0.001) and Claude 5 models reject
     any sampling parameter (live, 2026-10-17: HTTP 400 "temperature is deprecated for this model"), so drop them."""
     from langchain_anthropic import ChatAnthropic
@@ -70,15 +70,16 @@ def guardrail_llm(name: str):
     provider, _, model = name.partition(":")
     if provider != "anthropic":
         from langchain.chat_models import init_chat_model
-        return init_chat_model(name, max_tokens=16, timeout=60)
-    return _Claude(model=model, max_tokens=16, timeout=60, max_retries=2)
+        return init_chat_model(name, max_tokens=16, timeout=60, callbacks=callbacks, metadata={"kind": "injection-screen"})
+    return _Claude(model=model, max_tokens=16, timeout=60, max_retries=2, callbacks=callbacks,       # traced (redacted) like the agents
+                   metadata={"kind": "injection-screen"})
 
 
 class NemoInjectionChecker:
     """NeMo Guardrails input rails: a regex rail (known attacks, no model call) then the LLM self-check rail."""
 
-    def __init__(self, config_dir: Path, llm: Any = None, model_name: str = "anthropic:claude-haiku-5-5"):
-        self.config_dir, self._llm, self.model_name = Path(config_dir), llm, model_name
+    def __init__(self, config_dir: Path, llm: Any = None, model_name: str = "anthropic:claude-haiku-5-5", callbacks: list | None = None):
+        self.config_dir, self._llm, self.model_name, self.callbacks = Path(config_dir), llm, model_name, callbacks
         self._rails: Any | None = None
 
     def _get_rails(self):
@@ -87,7 +88,7 @@ class NemoInjectionChecker:
             from nemoguardrails import LLMRails, RailsConfig
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                self._rails = LLMRails(RailsConfig.from_path(str(self.config_dir)), llm=self._llm or guardrail_llm(self.model_name))
+                self._rails = LLMRails(RailsConfig.from_path(str(self.config_dir)), llm=self._llm or guardrail_llm(self.model_name, self.callbacks))
         return self._rails
 
     def check(self, text: str) -> InjectionVerdict:

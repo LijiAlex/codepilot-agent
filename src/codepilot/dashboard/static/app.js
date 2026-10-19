@@ -80,6 +80,12 @@ const render = {
      ["Cost (USD)" + (d.cost_source ? " — " + d.cost_source : ""), d.cost_usd === null ? "not tracked" : "$" + d.cost_usd]]
       .forEach(([k, v]) => { const c = el("div", null, "card"); c.appendChild(el("b", v)); c.appendChild(el("span", k, "muted")); cards.appendChild(c); });
     m.appendChild(cards);
+    if (d.usage) {                                     // from LangSmith traces
+      const sum = (o) => Object.values(o).reduce((a, u) => ({ cost: a.cost + (u.cost || 0), tokens_in: a.tokens_in + (u.tokens_in || 0), tokens_out: a.tokens_out + (u.tokens_out || 0) }), { cost: 0, tokens_in: 0, tokens_out: 0 });
+      const rows = [["Agents (all runs)", sum(d.usage.runs)], ["Injection screen (NeMo, Haiku)", d.usage.screen], ["Independent reviewer (GitHub Action)", d.usage.reviewer]];
+      m.appendChild(el("h2", "Where the tokens and cost go (from LangSmith traces)"));
+      m.appendChild(table(["Part", "Tokens in", "Tokens out", "Cost (USD)"], rows.map(([k, u]) => [k, num(u.tokens_in || 0), num(u.tokens_out || 0), "$" + (u.cost || 0).toFixed(3)])));
+    }
     if (d.cost_usd === null) m.appendChild(el("p", "Cost is not tracked: set LANGSMITH_API_KEY (LangSmith prices every model call) or add price_in_per_mtok and price_out_per_mtok to codepilot.yml.", "muted"));
     m.appendChild(table(["Status", "Runs"], Object.entries(d.by_state).map(([k, v]) => [status(k), num(v)])));
   },

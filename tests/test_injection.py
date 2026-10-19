@@ -74,3 +74,12 @@ def test_claude_wrapper_drops_sampling_params_claude_5_rejects(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-placeholder")
     payload = guardrail_llm("anthropic:claude-haiku-5-5")._get_request_payload([HumanMessage("hi")], temperature=0.001, top_p=0.5)
     assert "temperature" not in payload and "top_p" not in payload and payload["model"] == "claude-haiku-5-5"
+
+
+def test_guardrail_model_calls_go_to_the_given_tracer(monkeypatch):
+    from codepilot.safety.injection import guardrail_llm
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-placeholder")
+    from langchain_core.callbacks import BaseCallbackHandler
+    tracer = BaseCallbackHandler()
+    m = guardrail_llm("anthropic:claude-haiku-5-5", callbacks=[tracer])
+    assert m.callbacks == [tracer] and m.metadata["kind"] == "injection-screen"

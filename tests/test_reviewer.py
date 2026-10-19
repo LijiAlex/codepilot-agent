@@ -194,3 +194,13 @@ def test_needs_review_stays_without_a_human_approval():
     rv.run(FakeRepo(pr), 7, FakeClaude(responses=[tool_call("ReviewResult", REVIEW, "1")]), rv.TestSummary(passed=3),
            "rev[bot]", "codepilot-plus[bot]", force=True)
     assert "needs-review" not in pr.removed
+
+
+def test_reviewer_is_traced_to_its_own_langsmith_project_with_pr_metadata():
+    wf = yaml.safe_load((ROOT / "reviewer" / "workflow.yml").read_text())
+    env = next(s for s in wf["jobs"]["review"]["steps"] if "review.py" in s.get("run", ""))["env"]
+    assert env["LANGSMITH_API_KEY"] == "${{ secrets.LANGSMITH_API_KEY }}" and env["LANGSMITH_TRACING"] == "true"
+    assert env["LANGSMITH_PROJECT"] == "codepilot-reviewer"
+    assert "langsmith==" in (ROOT / "reviewer" / "requirements.txt").read_text()
+    src = (ROOT / "reviewer" / "review.py").read_text()
+    assert '"run_name": "independent-review"' in src and '"pr": pr_number' in src

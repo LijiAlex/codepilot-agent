@@ -38,6 +38,7 @@ class DashboardDeps:
     map_budget: int = 4000                      # Settings.repo_map_budget_tokens
     cost_tracked: bool = False                  # both model prices set in codepilot.yml
     trace_costs: Callable[[], dict] | None = None   # run_id -> USD from LangSmith (cached by the caller)
+    trace_usage: Callable[[], dict] | None = None   # langsmith_usage() result: runs / screen / reviewer (cached)
 
 
 class PRAction(BaseModel):
@@ -74,6 +75,12 @@ def create_app(deps: DashboardDeps, token: str, port: int) -> FastAPI:
 
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
+    def _safe(source):
+        try:
+            return source() if source else None
+        except Exception:                                  # noqa: BLE001 — LangSmith down: the page still loads
+            return None
+
     def _trace_costs() -> dict | None:
         if deps.trace_costs is None:
             return None
@@ -84,11 +91,14 @@ def create_app(deps: DashboardDeps, token: str, port: int) -> FastAPI:
 
     @app.get("/api/overview")
     def overview():
-        return data.overview(deps.conn, deps.cost_tracked, _trace_costs())
+        usage = _safe(deps.trace_usage)
+        return data.overview(deps.conn, deps.cost_tracked, None if usage else _trace_costs(), usage)
 
     @app.get("/api/matrix")
     def matrix():
-        return data.matrix(deps.conn, deps.runs_dir, _trace_costs())
+        usage = _safe(deps.trace_usage)
+        costs = {rid: u.get("cost") for rid, u in usage["runs"].items()} if usage else _trace_costs()
+        return data.matrix(deps.conn, deps.runs_dir, costs)
 
     @app.get("/api/runs/{run_id}")
     def run(run_id: str):

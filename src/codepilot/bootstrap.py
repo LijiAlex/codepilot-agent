@@ -76,17 +76,19 @@ def build_engine(settings: Settings, ui: UiCallbacks, config_dir: Path = Path(".
     def _rel(p: Path) -> Path:                       # relative paths resolve against the config file's folder
         return p if p.is_absolute() else Path(config_dir) / p
 
+    tracer = make_tracer(settings.langsmith_project)           # one redacting tracer: agents and the injection screen
     if settings.injection_checker == "bedrock":
         checker = BedrockInjectionChecker(_rel(settings.guardrail_policy_path))
     else:
-        checker = NemoInjectionChecker(_rel(settings.nemo_config_path), model_name=settings.guardrail_model)
+        checker = NemoInjectionChecker(_rel(settings.nemo_config_path), model_name=settings.guardrail_model,
+                                       callbacks=[tracer] if tracer else None)
     key_dir = [Path(os.environ[settings.github_app_key_path_env]).expanduser().parent] if os.environ.get(settings.github_app_key_path_env) else []
     providers = {"local": LocalSandboxProvider(home, home / "repos", extra_deny=key_dir),     # ~/.codepilot is always denied
                  "daytona": DaytonaSandboxProvider(home, home / "repos", snapshot=settings.daytona_snapshot,
                                                    auto_stop_minutes=settings.daytona_auto_stop_minutes)}
     services = Services(settings=settings, runs=runs, handoffs=handoffs, audit=audit, mirror=HostMirror(home),
                         providers=providers, make_models=lambda: {a: solver() for a in AGENTS}, triage_model=solver,
-                        episodic=episodic, lessons=lessons, file_index=file_index, tracer=make_tracer(settings.langsmith_project),
+                        episodic=episodic, lessons=lessons, file_index=file_index, tracer=tracer,
                         repo_skill=repo_skill)
     worker = Worker(services)
     ps = PublishServices(runs=runs, handoffs=handoffs, audit=audit, repo_factory=repo_factory, make_model=solver,
