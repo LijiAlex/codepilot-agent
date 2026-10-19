@@ -293,3 +293,11 @@ def test_review_shows_the_rubric_breakdown():
     body = pr.created[0][1]
     assert "**Score:** 9/10 · **Review effort:** 1/5" in body
     assert "**Rubric:** correctness 2/2 · tests 2/2 · matches the issue 2/2 · risk 2/2 · scope 1/2" in body and "one unrelated rename" in body
+
+
+def test_missing_test_results_count_as_not_run_not_failing(tmp_path):
+    # live 2026-10-19: fork PR #16 said "capped at 6: tests failing" although no tests ran
+    r = rv.RubricReview(**REVIEW)
+    missing = rv.parse_junit(tmp_path / "junit.xml")
+    assert rv.rubric_score(r, missing, fork=True) == (6, "capped at 6: tests not run")
+    assert rv.rubric_score(r, missing) == (6, "capped at 6: tests not run")
