@@ -58,6 +58,38 @@ def langsmith_usage(client: Any, project: str, reviewer_project: str | None = No
     return out
 
 
+INFRA_REASONS = ("setup:", "crashed", "sandbox_lost", "error:")
+
+
+def _outcome(state: str, reason: str | None) -> str:
+    r = reason or ""
+    if state in ("DONE", "PR_OPENED") or (state == "AWAITING_APPROVAL" and r in ("publish", "publish_failed")):
+        return "solved"                                  # a verified change exists (waiting only for the person's approval)
+    if state == "FAILED" and r.startswith("no change made"):
+        return "declined"                                # the agents explained why they changed nothing
+    if state == "FAILED" and r.startswith(INFRA_REASONS):
+        return "infrastructure"                          # sandbox / crash / internal error: not the agents' answer
+    if state in ("FAILED", "CLOSED", "SKIPPED"):
+        return "failed"
+    return "open"                                        # still running or waiting at another gate
+
+
+def issue_outcomes(conn: sqlite3.Connection) -> dict:
+    """Success per issue (its latest run), not per run: retries and infrastructure failures do not hide the answer."""
+    runs: dict[tuple, list] = {}
+    for r in conn.execute("select repo, issue_key, state, reason from runs order by rowid"):
+        runs.setdefault((r["repo"], r["issue_key"]), []).append(r)
+    counts = {"issues": len(runs), "solved": 0, "declined": 0, "failed": 0, "infrastructure": 0, "open": 0, "first_attempt": 0}
+    for attempts in runs.values():
+        out = _outcome(attempts[-1]["state"], attempts[-1]["reason"])
+        counts[out] += 1
+        if out == "solved" and len(attempts) == 1:
+            counts["first_attempt"] += 1
+    judged = counts["issues"] - counts["infrastructure"]
+    counts["rate"] = round(counts["solved"] / judged, 2) if judged else None
+    return counts
+
+
 def overview(conn: sqlite3.Connection, cost_tracked: bool = False, trace_costs: dict | None = None, trace_usage: dict | None = None) -> dict:
     by_state = {r["state"]: r["n"] for r in conn.execute("select state, count(*) n from runs group by state")}
     count = lambda a: conn.execute("select count(*) from events where action=?", (a,)).fetchone()[0]  # noqa: E731
@@ -71,7 +103,7 @@ def overview(conn: sqlite3.Connection, cost_tracked: bool = False, trace_costs: 
         extra = sum(trace_usage.get(k, {}).get("cost", 0.0) for k in ("screen", "improvement", "reviewer"))
     else:
         extra = 0.0
-    return {"runs": sum(by_state.values()), "by_state": by_state, "usage": trace_usage,
+    return {"runs": sum(by_state.values()), "by_state": by_state, "usage": trace_usage, "issues": issue_outcomes(conn),
             "prs_opened": conn.execute("select count(*) from runs where pr_url is not null").fetchone()[0],
             "pending_decisions": conn.execute("select count(*) from handoffs where status='pending'").fetchone()[0],
             "commands_refused": count("command_refused"), "issues_blocked": count("issue_blocked"),

@@ -129,15 +129,18 @@ const RULE_HELP = {   // shell-guard rules (src/codepilot/safety/commands.py rul
 const render = {
   async overview(m) {
     const [d, audit] = await Promise.all([api("overview"), api("audit").catch(() => ({ events: [] }))]);
-    const st = d.by_state || {}, ok = (st.DONE || 0) + (st.PR_OPENED || 0), finished = ok + (st.FAILED || 0) + (st.CLOSED || 0);
-    const cards = el("div", null, "cards");
-    [["Runs", num(d.runs), "runs"], ["Success rate (PR opened or merged, of finished runs)", finished ? Math.round(100 * ok / finished) + "% (" + ok + " of " + finished + ")" : "—", "runs"],
+        const cards = el("div", null, "cards");
+    const iss = d.issues || {}, judged = (iss.issues || 0) - (iss.infrastructure || 0);
+    [["Issues solved (latest run per issue)", iss.rate === null || iss.rate === undefined ? "—" : Math.round(100 * iss.rate) + "% (" + iss.solved + " of " + judged + ")", "runs"],
+     ["Solved on the first attempt", iss.solved ? iss.first_attempt + " of " + iss.solved : "—", "runs"],
+     ["Runs", num(d.runs), "runs"],
      ["PRs opened", num(d.prs_opened), "prs"], ["Runs waiting for approval (TUI)", num(d.pending_decisions), "runs"],
      ["Skill changes waiting", num(d.proposals_waiting), "improvements"], ["Commands refused", num(d.commands_refused), "safety"],
      ["Issues blocked", num(d.issues_blocked), "safety"], ["Tokens in / out", num(d.tokens_in) + " / " + num(d.tokens_out), ""],
      ["Cost (USD)" + (d.cost_source ? " — " + d.cost_source : ""), d.cost_usd === null ? "not tracked" : "$" + d.cost_usd, ""]]
       .forEach(([k, v, page]) => cards.appendChild(cardLink(k, v, page)));
     m.appendChild(cards);
+    if (d.issues) m.appendChild(el("p", "Per issue (its latest run): " + iss.solved + " solved (merged, PR opened, or verified and waiting for your approval) · " + iss.declined + " declined (the agents explained why they changed nothing) · " + iss.failed + " failed · " + iss.open + " still open · " + iss.infrastructure + " stopped by infrastructure (sandbox, crash — not counted in the rate).", "muted"));
     m.appendChild(el("p", "Outcomes: " + (Object.entries(st).map(([k, v]) => status(k) + " ×" + v).join(", ") || "no runs yet"), "muted"));
     if (d.usage) {                                     // from LangSmith traces
       const sum = (o) => Object.values(o).reduce((a, u) => ({ cost: a.cost + (u.cost || 0), tokens_in: a.tokens_in + (u.tokens_in || 0), tokens_out: a.tokens_out + (u.tokens_out || 0) }), { cost: 0, tokens_in: 0, tokens_out: 0 });

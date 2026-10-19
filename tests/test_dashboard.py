@@ -439,7 +439,7 @@ def test_rubric_points_reasons_and_cap_are_parsed():
 def test_page_has_the_qa_review_improvements():
     static = Path(__file__).parents[1] / "src" / "codepilot" / "dashboard" / "static"
     js, css = (static / "app.js").read_text(), (static / "style.css").read_text()
-    assert "Skills at a glance" in js and "Recent activity" in js and "Success rate" in js and "cardLink" in js   # overview
+    assert "Skills at a glance" in js and "Recent activity" in js and "Issues solved" in js and "cardLink" in js   # overview
     assert '"PR review")' in js and '"Review cost"' in js and "rubricCell" in js and "No open pull requests" in js  # reviewer + PRs
     assert "older" in js and "Never reached" in js and "duration(" in js and "filterInput" in js                  # runs
     assert "logRows" in js and "toLocaleTimeString" in js and "Jump to the diff" in js                             # run detail
@@ -486,3 +486,21 @@ def test_old_unparseable_rows_show_the_real_rule(env):
     AuditLog(env.conn).log("agent:coder", "command_refused", run_id=env.rid, target='python -c "import a;print(a)"',
                            result="refused", detail={"reason": "unparseable command"})          # saved by the old guard
     assert safety(env.conn, Path("/nonexistent"))["commands_refused"][0]["guard"] == "Shell guard · inline-python"
+
+
+def test_success_rate_is_per_issue_on_the_latest_run(tmp_path):
+    from codepilot.dashboard.data import issue_outcomes
+    from codepilot.db import connect
+    conn = connect(tmp_path / "cp.db")
+    def run(i, key, state, reason=None):
+        conn.execute("insert into runs(id, repo, kind, issue_key, title, state, reason) values(?,?,?,?,?,?,?)",
+                     (f"r{i}", "o/r", "issue", key, "t", state, reason))
+    run(1, "#1", "FAILED", "setup: box command failed"); run(2, "#1", "DONE")             # solved on the 2nd attempt
+    run(3, "#2", "AWAITING_APPROVAL", "publish")                                           # solved first time
+    run(4, "#3", "AWAITING_APPROVAL", "continue_fix")                                      # still open: not solved
+    run(5, "#4", "FAILED", "no change made — conflicts with a protected test")             # declined
+    run(6, "#5", "FAILED", "untested")                                                     # failed
+    run(7, "#6", "FAILED", "crashed")                                                      # infrastructure
+    o = issue_outcomes(conn)
+    assert (o["issues"], o["solved"], o["declined"], o["failed"], o["infrastructure"], o["open"]) == (6, 2, 1, 1, 1, 1)
+    assert o["rate"] == round(2 / 5, 2) and o["first_attempt"] == 1                        # 6 issues − 1 infrastructure
