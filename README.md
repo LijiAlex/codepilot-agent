@@ -109,7 +109,7 @@ FILL: `![LangSmith trace](docs/langsmith.png)` — one run's trace (Orchestrator
 - Daytona's free tier cannot block outbound network traffic; the sandbox holds no credentials and the shell guard refuses network tools, but egress itself is open (measured 2026-10-17 on a live box: outbound reachable; box start-up 9.6 s).
 - The local fallback sandbox (macOS `sandbox-exec`: no network, no writes outside the run, CodePilot+'s own files unreadable) is weaker than a remote box.
 - The command guard is a policy filter, not the security boundary: `python` and `pytest` run repository code by design, so the sandbox is the boundary.
-- The Independent Reviewer skips pull requests from forks, and its "tests green" signal comes from a job that runs the PR's own code.
+- The Independent Reviewer reviews pull requests from forks without running their code, so a fork PR is never merge-ready (its tests are reported as not run); for other PRs its "tests green" signal comes from a job that runs the PR's own code.
 - LangSmith keeps traces 14 days; README screenshots stand in for links.
 - If `main` changed 300 or more files since the run started, GitHub's compare API cannot list them all, so publishing is refused as a possible conflict.
 - Claude Sonnet 5.5 accepts only the default sampling temperature, so runs are not deterministic.
@@ -147,6 +147,7 @@ Also:
 - Labelled issues above the complexity threshold get a plan for a person to approve instead of being skipped; unassigned ones above it are skipped (brief bonus).
 - "In-progress issue IDs" are database claims (one active run per issue), shared by every thread.
 - The repo map is built by code at run start and written to `/shared/repo_map.md` (the agents' virtual file system), not by the Explorer with `write_file`.
+- The diff preview is written to `/shared/proposed_diff.txt` (the same working folder as the repo map and task state), not `working/proposed_diff.txt`.
 - Blocked commands are refused with a reason, not escalated; only commands nobody has classified go to a person.
 - Lint-on-edit uses `py_compile`; the repo map's LLM file descriptions are off; a release regex scan replaces gitleaks.
 
