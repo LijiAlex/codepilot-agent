@@ -15,6 +15,7 @@ table { border-collapse: collapse; width: 100%; background: var(--card); }
 th, td { border: 1px solid var(--line); padding: 4px 6px; text-align: left; vertical-align: top; }
 td.done { background: color-mix(in srgb, var(--ok) 25%, transparent); }
 td.failed { background: color-mix(in srgb, var(--bad) 25%, transparent); }
+td.voided { background: color-mix(in srgb, #d29922 25%, transparent); }
 pre { white-space: pre-wrap; background: var(--card); border: 1px solid var(--line); padding: 8px; overflow-x: auto; }
 .muted { color: var(--muted); }
 button.danger { color: var(--bad); }

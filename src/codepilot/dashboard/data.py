@@ -76,7 +76,8 @@ def overview(conn: sqlite3.Connection, cost_tracked: bool = False, trace_costs: 
 
 def _stage_marks(conn, runs_dir: Path, run: sqlite3.Row) -> dict[str, str]:
     """done / failed / '' per stage, from state events, handoffs and the final state."""
-    seen = {e["text"] for e in _events(runs_dir, run["id"]) if e["kind"] == "state"}
+    events = _events(runs_dir, run["id"])
+    seen = {e["text"] for e in events if e["kind"] == "state"}
     marks = {s: "" for s in STAGES}
     marks["Triaged"] = "done" if run["task_type"] else ""
     if "EXPLORING" in seen: marks["Explored"] = "done"
@@ -92,11 +93,18 @@ def _stage_marks(conn, runs_dir: Path, run: sqlite3.Row) -> dict[str, str]:
         marks["File check"] = "failed"
     if reason in ("tests", "untested"):
         marks["Tested"] = "failed"
+    if reason == "untested" and any(_tests_passed(e) for e in events):
+        marks["Tested"] = "voided"                     # tests passed, but a change after them was not re-tested
     if run["pr_url"]:
         marks["PR opened"] = "done"
     if run["state"] == "DONE":
         marks["Merged"] = "done"
     return marks
+
+
+def _tests_passed(e: dict) -> bool:
+    return e["kind"] == "tool_result" and (e.get("data") or {}).get("name") == "run_tests" \
+        and str(e.get("text", "")).startswith('{"outcome": "passed"')
 
 
 def matrix(conn, runs_dir: Path, trace_costs: dict | None = None) -> dict:

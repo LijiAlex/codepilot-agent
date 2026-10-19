@@ -64,6 +64,8 @@ function friendlySummary(text) {        // "FAILED(error: X): 1 | PR_OPENED: 2" 
   return flat.replace(/\b([A-Z_]{4,})(\(((?:[^()]|\([^()]*\))*)\))?: (\d+)/g,    // one level of nested brackets, e.g. "failed (1)"
     (m, st, _p, why, n) => status(st) + (why ? " (" + why.trim() + ")" : "") + " ×" + n);
 }
+const MARKS = { done: ["✓", ""], failed: ["✗", ""], voided: ["!", "Tests passed, but a later change was not re-tested, so the run stopped as untested"] };
+function markCell(mark) { const [sym, why] = MARKS[mark] || ["", ""], c = el("td", sym); if (mark) c.className = mark; if (why) c.title = why; return c; }
 function details(summary, body) { const d = el("details"), s = el("summary", summary); d.appendChild(s); d.appendChild(el("pre", body)); return d; }
 function diffBlock(diff) {
   const pre = el("pre", null, "diff");
@@ -96,7 +98,7 @@ const render = {
       r.pr_url ? td(link(status(r.state), r.pr_url)) : tdTitle(status(r.state) + (r.reason ? " — " + short(r.reason, 50) : ""), r.reason || ""),
       r.cost_usd === null || r.cost_usd === undefined ? "" : "$" + Number(r.cost_usd).toFixed(3),
       el("td", r.title, "title"), (r.type || "").replace(/_/g, " "),
-      ...d.stages.map(s => { const c = el("td", r.marks[s] === "done" ? "✓" : r.marks[s] === "failed" ? "✗" : ""); if (r.marks[s]) c.className = r.marks[s]; return c; })])));
+      ...d.stages.map(s => markCell(r.marks[s]))])));
   },
   async prs(m) {
     const d = await api("prs");

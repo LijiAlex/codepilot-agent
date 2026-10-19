@@ -299,3 +299,24 @@ def test_prs_needing_a_person_are_flagged_with_reasons():
 def parse(body):
     from codepilot.dashboard.data import parse_review
     return parse_review(body)
+
+
+def _untested_run(env, tmp_path, passed: bool):
+    runs = RunStore(env.conn)
+    rid = runs.claim("o/r", "issue", 5, "raise the pydantic floor")
+    runs.update(rid, task_type="dependency_update")
+    rec = EventRecorder(tmp_path / "runs" / rid / "events.jsonl")
+    rec.write(RunEvent(rid, "state", "worker", "TESTING"))
+    if passed:
+        rec.write(RunEvent(rid, "tool_result", "test-agent", '{"outcome": "passed", "passed": 193}', {"name": "run_tests"}))
+    runs.set_state(rid, RunState.FAILED, reason="untested")
+    return rid
+
+
+def test_tested_mark_says_tests_passed_but_verification_was_voided(env, tmp_path):
+    voided, never = _untested_run(env, tmp_path, True), _untested_run(env, tmp_path, False)
+    rows = {r["run_id"]: r for r in env.client.get("/api/matrix", headers=H).json()["rows"]}
+    assert rows[voided]["marks"]["Tested"] == "voided"           # tests ran and passed; a later change was not re-tested
+    assert rows[never]["marks"]["Tested"] == "failed"
+    js = (Path(__file__).parents[1] / "src" / "codepilot" / "dashboard" / "static" / "app.js").read_text()
+    assert "voided:" in js and "not re-tested" in js
