@@ -504,3 +504,18 @@ def test_success_rate_is_per_issue_on_the_latest_run(tmp_path):
     o = issue_outcomes(conn)
     assert (o["issues"], o["solved"], o["declined"], o["failed"], o["infrastructure"], o["open"]) == (6, 2, 1, 1, 1, 1)
     assert o["rate"] == round(2 / 5, 2) and o["first_attempt"] == 1                        # 6 issues − 1 infrastructure
+
+
+@pytest.mark.skipif(__import__("shutil").which("node") is None, reason="needs node")
+def test_every_page_renders_without_a_javascript_error(env, tmp_path):
+    # live 2026-10-19: Overview showed "st is not defined" — syntax checks and API tests cannot catch runtime errors
+    import subprocess
+    c, pages = env.client, ["overview", "matrix", "prs", "safety", "context", "memory", "skills", "audit", "improvements"]
+    resp = {p: c.get(f"/api/{p}", headers=H).json() for p in pages}
+    resp["run"] = c.get(f"/api/runs/{env.rid}", headers=H).json()
+    (tmp_path / "r.json").write_text(json.dumps(resp))
+    root = Path(__file__).parents[1]
+    out = subprocess.run(["node", str(root / "tests" / "js_smoke.js"), str(root / "src/codepilot/dashboard/static/app.js"),
+                          str(tmp_path / "r.json")], capture_output=True, text=True, timeout=60)
+    assert out.returncode == 0, out.stderr[-500:]
+    assert json.loads(out.stdout.strip().splitlines()[-1]) == {}

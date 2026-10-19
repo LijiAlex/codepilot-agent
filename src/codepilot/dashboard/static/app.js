@@ -130,6 +130,7 @@ const render = {
   async overview(m) {
     const [d, audit] = await Promise.all([api("overview"), api("audit").catch(() => ({ events: [] }))]);
         const cards = el("div", null, "cards");
+    const st = d.by_state || {};
     const iss = d.issues || {}, judged = (iss.issues || 0) - (iss.infrastructure || 0);
     [["Issues solved (latest run per issue)", iss.rate === null || iss.rate === undefined ? "—" : Math.round(100 * iss.rate) + "% (" + iss.solved + " of " + judged + ")", "runs"],
      ["Solved on the first attempt", iss.solved ? iss.first_attempt + " of " + iss.solved : "—", "runs"],
