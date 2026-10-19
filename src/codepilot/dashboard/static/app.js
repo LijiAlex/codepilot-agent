@@ -134,6 +134,9 @@ const render = {
     const panel = (title, page, lines) => { const p = el("section", null, "panel"), h = el("h3");
       if (page) { const a = el("a", title + " →"); a.href = "#" + page; h.appendChild(a); } else h.textContent = title;
       p.appendChild(h); lines.forEach(l => p.appendChild(l instanceof Node ? l : el("p", l))); return p; };
+    const stats = items => { const g = el("div", null, "stats");
+      items.forEach(([value, label, cls]) => { const b = el("div", null, "stat " + (cls || "")); b.appendChild(el("b", value)); b.appendChild(el("span", label, "muted small")); g.appendChild(b); });
+      return g; };
     const big = (value, label) => { const p = el("p", null, "headline"); p.appendChild(el("b", value)); p.appendChild(el("span", " " + label, "muted")); return p; };
 
     // Needs you: counts of things waiting for a person (the PR count fills in once GitHub answers)
@@ -152,28 +155,29 @@ const render = {
     [["solved", iss.solved], ["declined", iss.declined], ["failed", iss.failed], ["open", iss.open]].forEach(([k, n]) => {
       if (n) { const seg = el("span", k + " " + n, "seg " + k); seg.style.flex = String(n); bar.appendChild(seg); } });
     grid.appendChild(panel("Outcomes", "runs", [
-      big(iss.rate === null || iss.rate === undefined ? "—" : Math.round(100 * iss.rate) + "%", "issues solved (" + (iss.solved || 0) + " of " + judged + ", latest run per issue)"),
-      "First attempt: " + (iss.first_attempt || 0) + " of " + (iss.solved || 0) + " solved", bar,
-      el("p", (iss.infrastructure || 0) + " stopped by infrastructure (not counted) · " + num(d.runs) + " runs in total", "muted")]));
+      big(iss.rate === null || iss.rate === undefined ? "—" : Math.round(100 * iss.rate) + "%", "issues solved"), bar,
+      stats([[String(iss.solved || 0) + " of " + judged, "solved"], [(iss.first_attempt || 0) + " of " + (iss.solved || 0), "first attempt"],
+             [String(iss.declined || 0), "declined"], [String(iss.failed || 0), "failed"],
+             [String(iss.infrastructure || 0), "infrastructure (not counted)", "dim"], [num(d.runs), "runs in total", "dim"]])]));
     // Quality (filled from the Pull requests data)
-    const quality = panel("Quality", "prs", [el("p", "PRs opened " + num(d.prs_opened) + " · merged " + num((d.by_state || {}).DONE || 0)),
-                                            el("p", "loading reviews…", "muted")]);
+    const quality = panel("Quality", "prs", [el("p", "loading reviews…", "muted")]);
+    const prStats = [[num(d.prs_opened), "PRs opened"], [num((d.by_state || {}).DONE || 0), "merged"]];
     grid.appendChild(quality);
     // Safety
     const sf = d.safety || {};
     grid.appendChild(panel("Safety", "safety", [
-      big(num(sf.refused || 0), "commands refused — none of them ran"),
-      "Top rules: " + ((sf.top_rules || []).map(([r, n]) => r + " " + n).join(" · ") || "none"),
-      "Issues blocked by the injection screen: " + num(sf.issues_blocked || 0) + " · tools refused: " + num(sf.tools_refused || 0),
-      sf.screen ? el("p", "Screen measured: " + sf.screen.detected + " of " + sf.screen.malicious + " attacks blocked, " + sf.screen.false_alarms + " of " + sf.screen.benign + " harmless issues blocked", "muted") : el("p", "")]));
+      big(num(sf.refused || 0), "commands refused — none ran"),
+      stats((sf.top_rules || []).map(([r, n]) => [num(n), r]).concat([
+        [num(sf.issues_blocked || 0), "issues blocked"], [num(sf.tools_refused || 0), "tools refused"],
+        sf.screen ? [sf.screen.detected + " of " + sf.screen.malicious, "attacks blocked (measured)", "dim"] : null,
+        sf.screen ? [sf.screen.false_alarms + " of " + sf.screen.benign, "false alarms (measured)", "dim"] : null].filter(Boolean)))]));
     // Learning
     const ln = d.learning || {}, deltas = Object.entries(ln.failed_commands || {});
     grid.appendChild(panel("Learning", "improvements", [
-      big(Object.entries(ln.versions || {}).map(([r, v]) => r.split("/").pop() + " v" + v).join(" · ") || "—", "repo skills"),
-      "Skill changes: " + num(ln.approved || 0) + " approved · " + num(ln.waiting || 0) + " waiting",
-      "Lessons learned: " + num(ln.lessons || 0),
-      deltas.length ? "Failed commands per run: " + deltas.map(([r, x]) => r.split("/").pop() + " " + x.from + " (v" + x.versions[0] + ") → " + x.to + " (v" + x.versions[1] + ")").join(" · ")
-                    : el("p", "Version comparison appears once a newer repo-skill version has runs.", "muted")]));
+      big(num(ln.approved || 0), "skill changes approved"),
+      stats([[num(ln.waiting || 0), "waiting for you"], [num(ln.lessons || 0), "lessons learned"]]
+        .concat(Object.entries(ln.versions || {}).map(([r, v]) => ["v" + v, r.split("/").pop() + " skill"]))
+        .concat(deltas.map(([r, x]) => [x.from + " → " + x.to, "failed cmds/run v" + x.versions[0] + "→v" + x.versions[1] + " (" + r.split("/").pop() + ")"])))]));
     m.appendChild(grid);
 
     // Cost: blocks, not sentences — headline totals, one block per part, and a bar of each part's share
@@ -217,10 +221,12 @@ const render = {
       const avg = a => a.reduce((x, y) => x + y, 0) / a.length;
       const weakest = Object.entries(crit).map(([k, v]) => [k, avg(v)]).sort((a, b) => a[1] - b[1])[0];
       quality.removeChild(quality.lastChild);
-      quality.appendChild(reviewed.length ? big((avg(reviewed.map(p => p.review.fields.score))).toFixed(1) + "/10", "average independent review (" + plural(reviewed.length, "open PR") + ")") : el("p", "No open PR has an independent review yet.", "muted"));
-      if (reviewed.length) quality.appendChild(el("p", "Merge-ready: " + reviewed.filter(p => p.review.fields.merge_ready).length + " of " + reviewed.length +
-        (weakest && weakest[1] < 2 ? " · weakest rubric criterion: " + weakest[0] + " (" + weakest[1].toFixed(1) + "/2)" : " · every rubric criterion at 2/2")));
-    }).catch(() => { prNeeds.textContent = "pull requests unavailable"; quality.removeChild(quality.lastChild); quality.appendChild(el("p", "GitHub did not answer; see Pull requests.", "muted")); });
+      quality.appendChild(reviewed.length ? big((avg(reviewed.map(p => p.review.fields.score))).toFixed(1) + "/10", "average independent review")
+                                          : el("p", "No open PR has an independent review yet.", "muted"));
+      quality.appendChild(stats(prStats.concat(reviewed.length ? [
+        [reviewed.filter(p => p.review.fields.merge_ready).length + " of " + reviewed.length, "merge-ready"],
+        [weakest && weakest[1] < 2 ? weakest[0] + " " + weakest[1].toFixed(1) + "/2" : "—", "weakest rubric criterion"]] : [])));
+    }).catch(() => { prNeeds.textContent = "pull requests unavailable"; quality.removeChild(quality.lastChild); quality.appendChild(el("p", "GitHub did not answer; see Pull requests.", "muted")); quality.appendChild(stats(prStats)); });
   },
   async runs(m) {
     const d = await api("matrix");

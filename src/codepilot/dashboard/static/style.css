@@ -75,3 +75,7 @@ td details > summary { font-weight: normal; }
 .part.screen, .seg.screen { border-left-color: #8250df; } .seg.screen { background: #8250df; }
 .part.improve, .seg.improve { border-left-color: #1a7f37; } .seg.improve { background: #1a7f37; }
 .part.review, .seg.review { border-left-color: #d29922; } .seg.review { background: #d29922; }
+.stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 6px; margin-top: 8px; }
+.stat { display: flex; flex-direction: column; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
+.stat b { font-size: 17px; }
+.stat.dim b { color: var(--muted); }
