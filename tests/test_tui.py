@@ -52,7 +52,7 @@ async def test_four_panels_show_issues_task_logs_and_approvals():
         items = a.query_one("#approvals", ListView).children
         assert len(items) == 1
         text = str(items[0].query_one(Label).render())
-        assert "open PR to main — 9 files changed (>5-file gate)" in text
+        assert "open PR to main — 9 files (>5-file gate)" in text
         assert "PR-to-main / git push gate" in str(a.query_one("#approval-hint", Static).render())
 
 
@@ -257,4 +257,4 @@ async def test_demo_visibility_polling_context_guardrail_block_and_file_count():
         blocked = [p for p, _ in a.lines if p.startswith("[guardrail]")]
         assert blocked and "rm -rf build" in blocked[0] and "delete-files" in blocked[0]
         labels = [str(i.query_one(Label).render()) for i in a.query_one("#approvals", ListView).children]
-        assert "2 files changed" in labels[1] and ">5-file gate" not in labels[1]
+        assert labels[1].endswith("open PR to main — 2 files") and ">5-file gate" not in labels[1]

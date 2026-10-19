@@ -206,7 +206,7 @@ class CodePilotApp(App):
             short = "open PR to main" if h["entry_point"] == "publish" else ENTRY_LABEL.get(h["entry_point"], h["entry_point"])
             label = f"⚠ {_short(h['repo'])} {h['issue_key']}: {short}"       # full gate name on the Selected: line
             if h["entry_point"] == "publish" and h.get("file_count"):
-                label += f" — {h['file_count']} file{'s' if h['file_count'] != 1 else ''} changed"
+                label += f" — {h['file_count']} file{'s' if h['file_count'] != 1 else ''}"     # short: the gate tag must fit
             if "more_than_5_files" in h.get("flags", []):          # brief gate: commit touching more than 5 files (E18)
                 label += " (>5-file gate)"
             approvals.append(ListItem(Label(Text(label))))
