@@ -93,7 +93,8 @@ def create_app(deps: DashboardDeps, token: str, port: int) -> FastAPI:
     def overview():
         usage = _safe(deps.trace_usage)
         return data.overview(deps.conn, deps.cost_tracked, None if usage else _trace_costs(), usage) \
-            | {"skills": data.overview_skills(deps.conn, deps.repos)}
+            | {"skills": data.overview_skills(deps.conn, deps.repos)} \
+            | data.overview_summary(deps.conn, deps.repos, deps.lessons, deps.improvements, deps.results_dir)
 
     @app.get("/api/matrix")
     def matrix():

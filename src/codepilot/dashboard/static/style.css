@@ -55,3 +55,14 @@ td.rubric { font-family: ui-monospace, monospace; white-space: nowrap; cursor: h
 @keyframes spin { to { transform: rotate(360deg); } }
 td details > summary { font-weight: normal; }
 .table-wrap + .table-wrap { margin-top: 12px; }
+.needs { padding: 10px 12px; border: 1px solid #d29922; background: color-mix(in srgb, #d29922 14%, transparent); border-radius: 8px; margin-bottom: 12px; }
+.needs.ok { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent); }
+.needs a { margin-right: 4px; }
+.panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; margin-bottom: 12px; }
+.panel { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; }
+.panel h3 { margin: 0 0 6px; font-size: 15px; }
+.panel p { margin: 4px 0; }
+.headline b { font-size: 22px; }
+.bar { display: flex; gap: 2px; margin: 6px 0; font-size: 12px; }
+.bar .seg { padding: 2px 6px; border-radius: 4px; color: #fff; white-space: nowrap; overflow: hidden; }
+.bar .solved { background: var(--ok); } .bar .declined { background: #8250df; } .bar .failed { background: var(--bad); } .bar .open { background: #6e7781; }

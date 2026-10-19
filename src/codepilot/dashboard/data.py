@@ -412,3 +412,38 @@ def close_pr(repo, number: int, expected_head: str) -> dict:
         raise MergeRefused("the PR changed since the page loaded; reload and look again")
     pr.edit(state="closed")
     return {"closed": True}
+
+
+def overview_summary(conn: sqlite3.Connection, repos: list[str], lessons: Any, improvements: Any, results_dir: Path) -> dict:
+    """The Overview's Safety and Learning panels: counts only, each panel links to its tab for the detail."""
+    from collections import Counter
+    s = safety(conn, results_dir)
+    rules = Counter(r["guard"].split(" · ", 1)[-1] for r in s["commands_refused"])
+    m = s.get("guardrail_measurement") or {}
+    safety_panel = {"refused": len(s["commands_refused"]), "top_rules": [[k, n] for k, n in rules.most_common(3)],
+                    "issues_blocked": len(s["issues_blocked"]), "tools_refused": len(s["tools_refused"]),
+                    "screen": {k: m.get(k) for k in ("detected", "malicious", "false_alarms", "benign")} if m else None}
+    learning = {"lessons": 0, "waiting": 0, "approved": 0, "versions": {}, "failed_commands": {}}
+    if lessons is not None:
+        for repo in repos:
+            try:
+                learning["lessons"] += len(lessons.all(repo) or [])
+            except Exception:                              # noqa: BLE001 — lessons unreadable: show 0, not an error
+                pass
+    if improvements is not None:
+        learning["waiting"] = len(improvements.view(repos).get("proposals", []))
+        by_repo: dict[str, list] = {}
+        for t in improvements.trend(repos):
+            if t.get("version") and t.get("runs"):
+                by_repo.setdefault(t["repo"], []).append(t)
+        for repo, rows in by_repo.items():
+            if len(rows) >= 2:
+                learning["failed_commands"][repo] = {"from": rows[0]["failed_commands"], "to": rows[-1]["failed_commands"],
+                                                     "versions": [rows[0]["version"], rows[-1]["version"]]}
+    try:
+        learning["approved"] = conn.execute("select count(*) from repo_skill_proposals where status='approved'").fetchone()[0]
+        for r in conn.execute("select repo, max(version) v from repo_skill_versions group by repo"):
+            learning["versions"][r["repo"]] = r["v"]
+    except sqlite3.OperationalError:
+        pass
+    return {"safety": safety_panel, "learning": learning}

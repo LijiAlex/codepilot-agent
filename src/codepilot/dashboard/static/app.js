@@ -128,47 +128,82 @@ const RULE_HELP = {   // shell-guard rules (src/codepilot/safety/commands.py rul
 
 const render = {
   async overview(m) {
-    const [d, audit] = await Promise.all([api("overview"), api("audit").catch(() => ({ events: [] }))]);
-        const cards = el("div", null, "cards");
-    const st = d.by_state || {};
+    // An overview only: each panel is a summary that links to its tab (detail, history and activity live there).
+    const d = await api("overview");
     const iss = d.issues || {}, judged = (iss.issues || 0) - (iss.infrastructure || 0);
-    [["Issues solved (latest run per issue)", iss.rate === null || iss.rate === undefined ? "—" : Math.round(100 * iss.rate) + "% (" + iss.solved + " of " + judged + ")", "runs"],
-     ["Solved on the first attempt", iss.solved ? iss.first_attempt + " of " + iss.solved : "—", "runs"],
-     ["Runs", num(d.runs), "runs"],
-     ["PRs opened", num(d.prs_opened), "prs"], ["Runs waiting for approval (TUI)", num(d.pending_decisions), "runs"],
-     ["Skill changes waiting", num(d.proposals_waiting), "improvements"], ["Commands refused", num(d.commands_refused), "safety"],
-     ["Issues blocked", num(d.issues_blocked), "safety"], ["Tokens in / out", num(d.tokens_in) + " / " + num(d.tokens_out), ""],
-     ["Cost (USD)" + (d.cost_source ? " — " + d.cost_source : ""), d.cost_usd === null ? "not tracked" : "$" + d.cost_usd, ""]]
-      .forEach(([k, v, page]) => cards.appendChild(cardLink(k, v, page)));
-    m.appendChild(cards);
-    if (d.issues) m.appendChild(el("p", "Per issue (its latest run): " + iss.solved + " solved (merged, PR opened, or verified and waiting for your approval) · " + iss.declined + " declined (the agents explained why they changed nothing) · " + iss.failed + " failed · " + iss.open + " still open · " + iss.infrastructure + " stopped by infrastructure (sandbox, crash — not counted in the rate).", "muted"));
-    m.appendChild(el("p", "Outcomes: " + (Object.entries(st).map(([k, v]) => status(k) + " ×" + v).join(", ") || "no runs yet"), "muted"));
-    if (d.usage) {                                     // from LangSmith traces
-      const sum = (o) => Object.values(o).reduce((a, u) => ({ cost: a.cost + (u.cost || 0), tokens_in: a.tokens_in + (u.tokens_in || 0), tokens_out: a.tokens_out + (u.tokens_out || 0) }), { cost: 0, tokens_in: 0, tokens_out: 0 });
-      const rv = d.usage.reviewer || {}, sc = d.usage.screen || {};
-      const im = d.usage.improvement || {};
-      const rows = [["Solver agents — Orchestrator, Explorer, Coder, Test Agent, PR Agent (incl. triage)", plural(Object.keys(d.usage.runs || {}).length, "run"), sum(d.usage.runs || {})],
-        ["Injection screen (NeMo, Haiku)", plural(sc.count || 0, "screen"), sc],
-        ["Self-improvement — skill gap reports", plural(im.count || 0, "report"), im],
-        ["Independent reviewer (GitHub Action)", plural(rv.count || 0, "PR review"), rv]];
-      m.appendChild(el("h2", "Where the tokens and cost go (from LangSmith traces)"));
-      m.appendChild(table(["Part", "Count", "Tokens in", "Tokens out", "Cost (USD)"], rows.map(([k, n, u]) => [k, n, num(u.tokens_in || 0), num(u.tokens_out || 0), "$" + (u.cost || 0).toFixed(3)])));
-    }
-    if (d.cost_usd === null) m.appendChild(el("p", "Cost is not tracked: set LANGSMITH_API_KEY (LangSmith prices every model call) or add price_in_per_mtok and price_out_per_mtok to codepilot.yml.", "muted"));
-    if (d.skills) {
-      const h = el("h2", "Skills at a glance "), toSk = el("a", "Skills"), toImp = el("a", "Improvements");
-      toSk.href = "#skills"; toImp.href = "#improvements";
-      const sub = el("span", "— see ", "muted small"); sub.appendChild(toSk); sub.appendChild(document.createTextNode(" and ")); sub.appendChild(toImp); h.appendChild(sub);
-      m.appendChild(h);
-      m.appendChild(table(["Task skill", "Runs", "Outcomes"], d.skills.by_task.map(t => [words(t.task_type), num(t.runs),
-        Object.entries(t.outcomes).map(([k, v]) => status(k) + " ×" + v).join(", ")])));
-      m.appendChild(table(["Repository", "Repo skill version", "Changes waiting", "Changes approved"], d.skills.repos.map(r => [r.repo,
-        r.version ? "v" + r.version : "none yet", num(r.waiting), num(r.approved)])));
-    }
-    m.appendChild(el("h2", "Recent activity"));
-    m.appendChild(table(["When", "Run", "Who", "Action", "Target"], audit.events.slice(0, 10).map(e => [when(e.ts), td(runLink(e.linked_run || e.run_id)),
-      actorName(e.actor), words(e.action), td(textWithLinks(e.target || ""))])));
-    const all = el("a", "Full audit log"); all.href = "#audit"; m.appendChild(all);
+    const panel = (title, page, lines) => { const p = el("section", null, "panel"), h = el("h3");
+      if (page) { const a = el("a", title + " →"); a.href = "#" + page; h.appendChild(a); } else h.textContent = title;
+      p.appendChild(h); lines.forEach(l => p.appendChild(l instanceof Node ? l : el("p", l))); return p; };
+    const big = (value, label) => { const p = el("p", null, "headline"); p.appendChild(el("b", value)); p.appendChild(el("span", " " + label, "muted")); return p; };
+
+    // Needs you: counts of things waiting for a person (the PR count fills in once GitHub answers)
+    const needs = el("section", null, "needs"), prNeeds = el("span", "checking pull requests…", "muted");
+    const item = (n, label, page) => { const a = el("a", n + " " + label); a.href = "#" + page; return a; };
+    const waiting = [[d.pending_decisions, "approval" + (d.pending_decisions === 1 ? "" : "s") + " waiting (TUI)", "runs"],
+                     [d.proposals_waiting, "skill change" + (d.proposals_waiting === 1 ? "" : "s") + " to decide", "improvements"]].filter(([n]) => n > 0);
+    needs.appendChild(el("b", "Needs you: "));
+    waiting.forEach(([n, label, page]) => { needs.appendChild(item(n, label, page)); needs.appendChild(document.createTextNode(" · ")); });
+    needs.appendChild(prNeeds);
+    m.appendChild(needs);
+
+    const grid = el("div", null, "panels");
+    // Outcomes
+    const bar = el("div", null, "bar");
+    [["solved", iss.solved], ["declined", iss.declined], ["failed", iss.failed], ["open", iss.open]].forEach(([k, n]) => {
+      if (n) { const seg = el("span", k + " " + n, "seg " + k); seg.style.flex = String(n); bar.appendChild(seg); } });
+    grid.appendChild(panel("Outcomes", "runs", [
+      big(iss.rate === null || iss.rate === undefined ? "—" : Math.round(100 * iss.rate) + "%", "issues solved (" + (iss.solved || 0) + " of " + judged + ", latest run per issue)"),
+      "First attempt: " + (iss.first_attempt || 0) + " of " + (iss.solved || 0) + " solved", bar,
+      el("p", (iss.infrastructure || 0) + " stopped by infrastructure (not counted) · " + num(d.runs) + " runs in total", "muted")]));
+    // Quality (filled from the Pull requests data)
+    const quality = panel("Quality", "prs", [el("p", "PRs opened " + num(d.prs_opened) + " · merged " + num((d.by_state || {}).DONE || 0)),
+                                            el("p", "loading reviews…", "muted")]);
+    grid.appendChild(quality);
+    // Safety
+    const sf = d.safety || {};
+    grid.appendChild(panel("Safety", "safety", [
+      big(num(sf.refused || 0), "commands refused — none of them ran"),
+      "Top rules: " + ((sf.top_rules || []).map(([r, n]) => r + " " + n).join(" · ") || "none"),
+      "Issues blocked by the injection screen: " + num(sf.issues_blocked || 0) + " · tools refused: " + num(sf.tools_refused || 0),
+      sf.screen ? el("p", "Screen measured: " + sf.screen.detected + " of " + sf.screen.malicious + " attacks blocked, " + sf.screen.false_alarms + " of " + sf.screen.benign + " harmless issues blocked", "muted") : el("p", "")]));
+    // Learning
+    const ln = d.learning || {}, deltas = Object.entries(ln.failed_commands || {});
+    grid.appendChild(panel("Learning", "improvements", [
+      big(Object.entries(ln.versions || {}).map(([r, v]) => r.split("/").pop() + " v" + v).join(" · ") || "—", "repo skills"),
+      "Skill changes: " + num(ln.approved || 0) + " approved · " + num(ln.waiting || 0) + " waiting",
+      "Lessons learned: " + num(ln.lessons || 0),
+      deltas.length ? "Failed commands per run: " + deltas.map(([r, x]) => r.split("/").pop() + " " + x.from + " (v" + x.versions[0] + ") → " + x.to + " (v" + x.versions[1] + ")").join(" · ")
+                    : el("p", "Version comparison appears once a newer repo-skill version has runs.", "muted")]));
+    m.appendChild(grid);
+
+    // Cost
+    const u = d.usage, cost = d.cost_usd;
+    const costLines = [big(cost === null || cost === undefined ? "not tracked" : "$" + cost,
+      cost && iss.solved ? "total · $" + (cost / iss.solved).toFixed(2) + " per solved issue" : "total")];
+    if (u) {
+      const sum = o => Object.values(o || {}).reduce((a, x) => a + (x.cost || 0), 0);
+      costLines.push("Solver agents $" + sum(u.runs).toFixed(2) + " · injection screen $" + (u.screen?.cost || 0).toFixed(3) +
+        " · self-improvement $" + (u.improvement?.cost || 0).toFixed(3) + " · reviewer $" + (u.reviewer?.cost || 0).toFixed(3) + " (" + plural(u.reviewer?.count || 0, "review") + ")");
+      costLines.push(el("p", "Tokens in / out: " + num(d.tokens_in) + " / " + num(d.tokens_out) + " (solver) · source: LangSmith traces", "muted"));
+    } else costLines.push(el("p", "Set LANGSMITH_API_KEY (LangSmith prices every model call) or add model prices to codepilot.yml.", "muted"));
+    m.appendChild(panel("Cost", "", costLines));
+
+    // Fill Quality and the PR part of "Needs you" from the Pull requests data, without holding the page up
+    api("prs").then(prs => {
+      const rows = Object.values(prs).filter(Array.isArray).flat(), reviewed = rows.filter(p => p.review && p.review.fields && p.review.fields.score !== null);
+      const attention = rows.filter(p => (p.attention || []).length).length;
+      prNeeds.textContent = ""; prNeeds.className = "";
+      if (attention) prNeeds.appendChild(item(attention, "PR" + (attention === 1 ? "" : "s") + " to look at", "prs"));
+      if (!waiting.length && !attention) { needs.textContent = "✓ Nothing is waiting for you"; needs.className = "needs ok"; }
+      const crit = {};
+      reviewed.forEach(p => Object.entries(p.review.fields.rubric || {}).forEach(([k, v]) => { (crit[k] = crit[k] || []).push(v); }));
+      const avg = a => a.reduce((x, y) => x + y, 0) / a.length;
+      const weakest = Object.entries(crit).map(([k, v]) => [k, avg(v)]).sort((a, b) => a[1] - b[1])[0];
+      quality.removeChild(quality.lastChild);
+      quality.appendChild(reviewed.length ? big((avg(reviewed.map(p => p.review.fields.score))).toFixed(1) + "/10", "average independent review (" + plural(reviewed.length, "open PR") + ")") : el("p", "No open PR has an independent review yet.", "muted"));
+      if (reviewed.length) quality.appendChild(el("p", "Merge-ready: " + reviewed.filter(p => p.review.fields.merge_ready).length + " of " + reviewed.length +
+        (weakest ? " · weakest rubric criterion: " + weakest[0] + " (" + weakest[1].toFixed(1) + "/2)" : "")));
+    }).catch(() => { prNeeds.textContent = "pull requests unavailable"; quality.removeChild(quality.lastChild); quality.appendChild(el("p", "GitHub did not answer; see Pull requests.", "muted")); });
   },
   async runs(m) {
     const d = await api("matrix");

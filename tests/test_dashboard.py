@@ -439,8 +439,8 @@ def test_rubric_points_reasons_and_cap_are_parsed():
 def test_page_has_the_qa_review_improvements():
     static = Path(__file__).parents[1] / "src" / "codepilot" / "dashboard" / "static"
     js, css = (static / "app.js").read_text(), (static / "style.css").read_text()
-    assert "Skills at a glance" in js and "Recent activity" in js and "Issues solved" in js and "cardLink" in js   # overview
-    assert '"PR review")' in js and '"Review cost"' in js and "rubricCell" in js and "No open pull requests" in js  # reviewer + PRs
+    assert "Needs you" in js and "Outcomes" in js and "Learning" in js and "issues solved" in js and "Recent activity" not in js   # overview
+    assert '"review")' in js and '"Review cost"' in js and "rubricCell" in js and "No open pull requests" in js  # reviewer + PRs
     assert "older" in js and "Never reached" in js and "duration(" in js and "filterInput" in js                  # runs
     assert "logRows" in js and "toLocaleTimeString" in js and "Jump to the diff" in js                             # run detail
     assert "Commands that differ only in spacing are grouped" in js and '"What", "Result"' not in js
@@ -461,7 +461,7 @@ def test_self_improvement_calls_have_their_own_usage_line(env):
     assert u["improvement"] == {"count": 1, "cost": 0.03, "tokens_in": 900, "tokens_out": 120} and u["runs"] == {}
     assert data.overview(env.conn, trace_usage=u)["cost_usd"] == 0.03
     js = (Path(__file__).parents[1] / "src" / "codepilot" / "dashboard" / "static" / "app.js").read_text()
-    assert "Solver agents" in js and "Self-improvement" in js
+    assert "Solver agents" in js and "self-improvement" in js.lower()
 
 
 def test_safety_rows_name_the_guard_and_rule(env):
@@ -519,3 +519,21 @@ def test_every_page_renders_without_a_javascript_error(env, tmp_path):
                           str(tmp_path / "r.json")], capture_output=True, text=True, timeout=60)
     assert out.returncode == 0, out.stderr[-500:]
     assert json.loads(out.stdout.strip().splitlines()[-1]) == {}
+
+
+def test_overview_summary_has_safety_and_learning_panels(env):
+    from codepilot.audit import AuditLog
+    from codepilot.dashboard.data import overview_summary
+    a = AuditLog(env.conn)
+    for cmd in ('python -c "import x"', 'python -c "import y"', "python -m pip show x"):
+        a.log("agent:coder", "command_refused", run_id=env.rid, target=cmd, result="refused", detail={"reason": "x"})
+    class Lessons:
+        def all(self, repo): return [{"text": "a"}, {"text": "b"}]
+    class Improvements:
+        def trend(self, repos): return [{"repo": "o/r", "version": 1, "runs": 3, "failed_commands": 1.5},
+                                        {"repo": "o/r", "version": 2, "runs": 2, "failed_commands": 0.5}]
+        def view(self, repos): return {"proposals": [{"id": "p1"}]}
+    s = overview_summary(env.conn, ["o/r"], Lessons(), Improvements(), Path("/nonexistent"))
+    assert s["safety"]["refused"] == 4 and s["safety"]["top_rules"][0] == ["inline-python", 2]   # fixture has 1 git push
+    assert s["learning"]["lessons"] == 2 and s["learning"]["waiting"] == 1
+    assert s["learning"]["failed_commands"] == {"o/r": {"from": 1.5, "to": 0.5, "versions": [1, 2]}}
