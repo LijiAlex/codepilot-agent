@@ -83,14 +83,20 @@ class FakeRepo:
     def compare(self, a, b): return NS(files=files(("pkg/slugs.py", 1, 0)))
 
 
-REVIEW = {"summary": "Guards empty input.", "score": 9, "effort": 1, "security_concerns": [], "compliance": "Fixes the crash.",
+def crit(points, reason="ok"):
+    return {"points": points, "reason": reason}
+
+
+RUBRIC = {"correctness": crit(2), "tests": crit(2), "matches_issue": crit(2), "risk": crit(2), "scope": crit(1, "one unrelated rename")}
+REVIEW = {"summary": "Guards empty input.", "rubric": RUBRIC, "security_concerns": [], "compliance": "Fixes the crash.",   # the model's answer
           "key_issues": [{"file": "pkg/slugs.py", "start_line": 2, "end_line": 3, "issue": "consider a docstring"},
                          {"file": "pkg/other.py", "start_line": 1, "end_line": 1, "issue": "not in the diff"}]}
+REVIEW_RESULT = {**{k: v for k, v in REVIEW.items() if k != "rubric"}, "score": 9, "effort": 1}           # what the code builds
 
 
 def test_run_posts_inline_where_valid_and_labels_merge_ready():
     pr = FakePR(labels=["codepilot-generated"])
-    out = rv.run(FakeRepo(pr), 7, FakeClaude(responses=[tool_call("ReviewResult", REVIEW, "1")]), rv.TestSummary(passed=3), "rev[bot]",
+    out = rv.run(FakeRepo(pr), 7, FakeClaude(responses=[tool_call("RubricReview", REVIEW, "1")]), rv.TestSummary(passed=3), "rev[bot]",
                  "codepilot-plus[bot]")
     commit, body, event, comments = pr.created[0]
     assert event == "COMMENT" and commit.sha == "h2"
@@ -101,7 +107,7 @@ def test_run_posts_inline_where_valid_and_labels_merge_ready():
 def test_second_run_reviews_only_new_commits_and_skips_same_sha():
     old = NS(user=NS(login="rev[bot]"), commit_id="h1", state="COMMENTED")
     pr = FakePR(reviews=[old], labels=["merge-ready"])
-    rv.run(FakeRepo(pr), 7, FakeClaude(responses=[tool_call("ReviewResult", {**REVIEW, "score": 5}, "1")]), rv.TestSummary(passed=3), "rev[bot]")
+    rv.run(FakeRepo(pr), 7, FakeClaude(responses=[tool_call("RubricReview", {**REVIEW, "rubric": {**RUBRIC, "correctness": crit(0), "tests": crit(0), "scope": crit(1)}}, "1")]), rv.TestSummary(passed=3), "rev[bot]")
     assert "changes since h1" in pr.created[0][1] and pr.removed == ["merge-ready"]
     same = FakePR(reviews=[NS(user=NS(login="rev[bot]"), commit_id="h2", state="COMMENTED")])
     assert rv.run(FakeRepo(same), 7, FakeClaude(responses=[]), rv.TestSummary(), "rev[bot]") == {"skipped": "already reviewed at this commit"}
@@ -130,13 +136,13 @@ def test_workflow_security_properties():
 
 def test_label_alone_does_not_make_a_pr_skip_human_approval():
     pr = FakePR(labels=["codepilot-generated"]); pr.user = NS(login="mallory")
-    out = rv.run(FakeRepo(pr), 7, FakeClaude(responses=[tool_call("ReviewResult", REVIEW, "1")]), rv.TestSummary(passed=3),
+    out = rv.run(FakeRepo(pr), 7, FakeClaude(responses=[tool_call("RubricReview", REVIEW, "1")]), rv.TestSummary(passed=3),
                  "rev[bot]", "codepilot-plus[bot]")
     assert out["ready"] is False and "needs a human approval" in out["why"]
 
 
 def test_human_approval_at_a_reviewed_commit_rechecks_merge_ready_without_a_new_review():
-    body = rv.render_body(rv.ReviewResult(**{**REVIEW, "key_issues": []}), False, ["needs a human approval"], None, [])
+    body = rv.render_body(rv.ReviewResult(**{**REVIEW_RESULT, "key_issues": []}), False, ["needs a human approval"], None, [])
     pr = FakePR(reviews=[NS(user=NS(login="rev[bot]"), commit_id="h2", state="COMMENTED", body=body),
                          NS(user=NS(login="alice"), commit_id="h2", state="APPROVED", body="")])
     pr.user = NS(login="alice")
@@ -153,7 +159,7 @@ def test_workflow_ignores_the_reviewers_own_reviews():
 def test_pending_label_asks_for_a_full_review_and_is_swapped_for_completed():
     pr = FakePR(reviews=[NS(user=NS(login="rev[bot]"), commit_id="h2", state="COMMENTED", body="**Score:** 9/10")],
                 labels=["codepilot-generated", "needs-review", "codepilot-review-pending"])
-    out = rv.run(FakeRepo(pr), 7, FakeClaude(responses=[tool_call("ReviewResult", REVIEW, "1")]), rv.TestSummary(passed=3),
+    out = rv.run(FakeRepo(pr), 7, FakeClaude(responses=[tool_call("RubricReview", REVIEW, "1")]), rv.TestSummary(passed=3),
                  "rev[bot]", "codepilot-plus[bot]", force=True)
     assert out["score"] == 9 and len(pr.created) == 1 and "changes since" not in pr.created[0][1]    # whole PR, not a delta
     assert pr.removed == ["codepilot-review-pending"] and "codepilot-review-completed" in pr.added   # needs-review (brief) stays
@@ -162,7 +168,7 @@ def test_pending_label_asks_for_a_full_review_and_is_swapped_for_completed():
 def test_a_review_after_new_commits_also_marks_the_pr_reviewed():
     old = NS(user=NS(login="rev[bot]"), commit_id="h1", state="COMMENTED")
     pr = FakePR(reviews=[old], labels=["codepilot-generated"])
-    rv.run(FakeRepo(pr), 7, FakeClaude(responses=[tool_call("ReviewResult", REVIEW, "1")]), rv.TestSummary(passed=3), "rev[bot]")
+    rv.run(FakeRepo(pr), 7, FakeClaude(responses=[tool_call("RubricReview", REVIEW, "1")]), rv.TestSummary(passed=3), "rev[bot]")
     assert "codepilot-review-completed" in pr.added
 
 
@@ -182,7 +188,7 @@ def test_reviewer_model_uses_the_default_temperature():
 
 
 def test_a_human_approval_clears_needs_review():
-    body = rv.render_body(rv.ReviewResult(**{**REVIEW, "key_issues": []}), True, [], None, [])
+    body = rv.render_body(rv.ReviewResult(**{**REVIEW_RESULT, "key_issues": []}), True, [], None, [])
     pr = FakePR(reviews=[NS(user=NS(login="rev[bot]"), commit_id="h2", state="COMMENTED", body=body),
                          NS(user=NS(login="alice"), commit_id="h2", state="APPROVED", body="")],
                 labels=["codepilot-generated", "needs-review", "codepilot-review-completed"])
@@ -192,7 +198,7 @@ def test_a_human_approval_clears_needs_review():
 
 def test_needs_review_stays_without_a_human_approval():
     pr = FakePR(labels=["codepilot-generated", "needs-review", "codepilot-review-pending"])
-    rv.run(FakeRepo(pr), 7, FakeClaude(responses=[tool_call("ReviewResult", REVIEW, "1")]), rv.TestSummary(passed=3),
+    rv.run(FakeRepo(pr), 7, FakeClaude(responses=[tool_call("RubricReview", REVIEW, "1")]), rv.TestSummary(passed=3),
            "rev[bot]", "codepilot-plus[bot]", force=True)
     assert "needs-review" not in pr.removed
 
@@ -234,7 +240,7 @@ def test_fork_prs_get_a_review_job_that_never_touches_their_code():
 
 def test_a_fork_pr_is_reviewed_but_never_marked_merge_ready():
     pr = FakePR(labels=[]); pr.user = NS(login="stranger")
-    out = rv.run(FakeRepo(pr), 7, FakeClaude(responses=[tool_call("ReviewResult", REVIEW, "1")]), rv.TestSummary(),
+    out = rv.run(FakeRepo(pr), 7, FakeClaude(responses=[tool_call("RubricReview", REVIEW, "1")]), rv.TestSummary(),
                  "rev[bot]", "codepilot-plus[bot]", fork=True)
     body = pr.created[0][1]
     assert out["ready"] is False and "merge-ready" not in pr.added and "fork" in " ".join(out["why"])
@@ -255,3 +261,35 @@ def test_workflow_conditions_use_only_github_expression_operators():
     wf = yaml.safe_load((ROOT / "reviewer" / "workflow.yml").read_text())
     for name, job in wf["jobs"].items():
         assert not re.search(r"[^=!<>]\s[+\-*/]\s", job["if"]), name
+
+
+
+# --- rubric score and computed effort ---------------------------------------------------------------------------------
+def test_effort_is_computed_from_the_diff():
+    e = rv.review_effort
+    assert e(files(("a.py", 3, 1))) == 1
+    assert e(files(("a.py", 40, 10))) == 2
+    assert e(files(("a.py", 10, 0), ("b.py", 10, 0), ("c.py", 10, 0))) == 3
+    assert e(files(("a.py", 400, 100))) == 4
+    assert e(files(("a.py", 900, 0))) == 5
+    assert e(files((".github/workflows/ci.yml", 2, 0))) == 5                       # protected / CI paths: always hardest
+    assert e(files(("pyproject.toml", 1, 1))) == 3                                 # packaging / lock files: at least 3
+
+
+def test_score_is_the_rubric_sum_with_hard_caps():
+    r = rv.RubricReview(**REVIEW)
+    assert rv.rubric_score(r, rv.TestSummary(passed=3)) == (9, "")
+    sec = rv.RubricReview(**{**REVIEW, "security_concerns": ["token logged"]})
+    assert rv.rubric_score(sec, rv.TestSummary(passed=3)) == (4, "capped at 4: security concerns")
+    assert rv.rubric_score(r, rv.TestSummary(passed=0)) == (6, "capped at 6: tests not run")
+    assert rv.rubric_score(r, rv.TestSummary(passed=3, failed=1)) == (6, "capped at 6: tests failing")
+    assert rv.rubric_score(r, rv.TestSummary(passed=3), fork=True) == (6, "capped at 6: tests not run")
+
+
+def test_review_shows_the_rubric_breakdown():
+    pr = FakePR(labels=["codepilot-review-pending"])
+    rv.run(FakeRepo(pr), 7, FakeClaude(responses=[tool_call("RubricReview", REVIEW, "1")]), rv.TestSummary(passed=3), "rev[bot]",
+           "codepilot-plus[bot]", force=True)
+    body = pr.created[0][1]
+    assert "**Score:** 9/10 · **Review effort:** 1/5" in body
+    assert "**Rubric:** correctness 2/2 · tests 2/2 · matches the issue 2/2 · risk 2/2 · scope 1/2" in body and "one unrelated rename" in body
