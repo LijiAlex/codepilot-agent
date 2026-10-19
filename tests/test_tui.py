@@ -216,3 +216,20 @@ async def test_log_lines_wrap_to_a_narrow_panel_instead_of_scrolling_sideways():
         await pilot.pause(0.3)
         log = a.query_one("#logs", RichLog)
         assert log.scroll_x == 0 and log.virtual_size.width <= log.scrollable_content_region.width
+
+
+@pytest.mark.anyio
+async def test_arrow_keys_switch_the_past_log_and_refreshes_keep_the_cursor():
+    a, eng = app()
+    eng.state["runs"] = [{"id": "r1", "repo": "o/r", "issue_key": "#1", "title": "one", "state": "PR_OPENED", "reason": None},
+                         {"id": "r2", "repo": "o/r", "issue_key": "#2", "title": "two", "state": "FAILED", "reason": "tests"}]
+    eng.state["skipped"] = {}
+    eng.run_log = lambda rid, limit=200: [{"agent": "coder", "kind": "message", "text": f"log of {rid}"}]
+    async with a.run_test(size=(140, 40)) as pilot:
+        await pilot.pause()
+        t = a.query_one("#issues", DataTable); t.focus(); await pilot.pause()
+        await pilot.press("down"); await pilot.pause(0.3)
+        text = lambda: "\n".join(str(line.text) for line in a.query_one("#logs", RichLog).lines)
+        assert "log of r2" in text() and "log of r1" not in text()
+        a.refresh_view(); await pilot.pause(0.3)                     # a poll or run event refreshes the screen
+        assert t.cursor_row == 1 and "log of r2" in text()          # cursor and log stay on #2

@@ -145,6 +145,8 @@ class CodePilotApp(App):
     def refresh_view(self) -> None:
         v = self.engine.view()
         table = self.query_one("#issues", DataTable)
+        keep = self.issue_rows[table.cursor_row] if 0 <= table.cursor_row < len(self.issue_rows) else None
+        self._refreshing = True                               # rebuilding moves the cursor: not a person choosing a row
         table.clear()
         self.issue_rows = []
         seen: set[tuple[str, str]] = set()
@@ -165,6 +167,15 @@ class CodePilotApp(App):
                 continue                                      # already listed with its run's state
             table.add_row(Text(f"{_short(repo)} #{num}"), Text(f"– skipped: {why}"), "")
             self.issue_rows.append({"repo": repo, "issue_key": f"#{num}"})
+        if keep is not None:
+            at = next((i for i, r in enumerate(self.issue_rows)
+                       if (r.get("repo"), r.get("issue_key")) == (keep.get("repo"), keep.get("issue_key"))), None)
+            if at is not None:
+                table.move_cursor(row=at, animate=False)
+
+        def done_refreshing() -> None:
+            self._refreshing = False
+        self.call_after_refresh(done_refreshing)
         approvals = self.query_one("#approvals", ListView)
         keep = self._selected_id()
         had_pending = bool(self.pending)
@@ -256,13 +267,23 @@ class CodePilotApp(App):
         if h:
             self.push_screen(InspectScreen(self.engine.inspect(h["id"])))
 
+    def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
+        """Arrow keys over the issue list: the log follows the highlighted row (not while the screen is being rebuilt)."""
+        if event.data_table.id == "issues" and event.data_table.has_focus and not getattr(self, "_refreshing", False):
+            self._show_past_log(event.cursor_row)
+
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         """Enter / click on an issue row: show that run's recorded log (it may have run in another process)."""
-        if event.data_table.id != "issues" or not 0 <= event.cursor_row < len(self.issue_rows):
+        if event.data_table.id == "issues":
+            self._show_past_log(event.cursor_row)
+
+    def _show_past_log(self, index: int) -> None:
+        if not 0 <= index < len(self.issue_rows) or getattr(self, "_shown_log", None) == self.issue_rows[index].get("id"):
             return
-        row = self.issue_rows[event.cursor_row]
+        row = self.issue_rows[index]
         if not row.get("id"):
             return
+        self._shown_log = row["id"]
         log = self.query_one("#logs", RichLog)
         log.clear()
         log.write(Text(f"— past log of {row['repo']} {row['issue_key']} (run {row['id']}) —", style="bold yellow"))
