@@ -226,7 +226,10 @@ def test_fork_prs_get_a_review_job_that_never_touches_their_code():
     assert run_env["FORK_PR"] == "true"
     for name in ("tests", "review"):                                                        # same-repo path only on pull_request
         assert "github.event_name != 'pull_request_target'" in wf["jobs"][name]["if"]
-    assert "cancel-in-progress" in yaml.safe_dump(wf.get("concurrency", {}))
+    # live 2026-10-19: workflow-level concurrency let a no-op event cancel a running review → only review jobs hold the group
+    assert "concurrency" not in wf
+    for name in ("review", "review-fork"):
+        assert wf["jobs"][name]["concurrency"]["cancel-in-progress"] is True
 
 
 def test_a_fork_pr_is_reviewed_but_never_marked_merge_ready():
