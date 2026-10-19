@@ -101,7 +101,7 @@ def test_run_posts_inline_where_valid_and_labels_merge_ready():
     commit, body, event, comments = pr.created[0]
     assert event == "COMMENT" and commit.sha == "h2"
     assert comments == [{"path": "pkg/slugs.py", "line": 3, "side": "RIGHT", "body": "consider a docstring", "start_line": 2, "start_side": "RIGHT"}]
-    assert "pkg/other.py" in body and "Merge-ready:** yes" in body and pr.added == ["merge-ready", "codepilot-review-completed"] and out["ready"]
+    assert "pkg/other.py" in body and "Merge-ready:** yes" in body and pr.added == ["merge-ready", "needs-review", "codepilot-review-completed"] and out["ready"]
 
 
 def test_second_run_reviews_only_new_commits_and_skips_same_sha():
@@ -301,3 +301,11 @@ def test_missing_test_results_count_as_not_run_not_failing(tmp_path):
     missing = rv.parse_junit(tmp_path / "junit.xml")
     assert rv.rubric_score(r, missing, fork=True) == (6, "capped at 6: tests not run")
     assert rv.rubric_score(r, missing) == (6, "capped at 6: tests not run")
+
+
+def test_any_pr_without_a_human_approval_gets_needs_review():
+    # user 2026-10-19: fork PR #16 was not merge-ready but had no needs-review label
+    pr = FakePR(labels=[]); pr.user = NS(login="stranger")
+    rv.run(FakeRepo(pr), 7, FakeClaude(responses=[tool_call("RubricReview", REVIEW, "1")]), rv.TestSummary(),
+           "rev[bot]", "codepilot-plus[bot]", fork=True)
+    assert "needs-review" in pr.added
