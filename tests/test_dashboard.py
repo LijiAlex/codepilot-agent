@@ -440,7 +440,7 @@ def test_page_has_the_qa_review_improvements():
     static = Path(__file__).parents[1] / "src" / "codepilot" / "dashboard" / "static"
     js, css = (static / "app.js").read_text(), (static / "style.css").read_text()
     assert "Needs you" in js and "Outcomes" in js and "Learning" in js and "issues solved" in js and "Recent activity" not in js   # overview
-    assert '"review")' in js and '"Review cost"' in js and "rubricCell" in js and "No open pull requests" in js  # reviewer + PRs
+    assert '"PR review")' in js and '"Review cost"' in js and "rubricCell" in js and "No open pull requests" in js  # reviewer + PRs
     assert "older" in js and "Never reached" in js and "duration(" in js and "filterInput" in js                  # runs
     assert "logRows" in js and "toLocaleTimeString" in js and "Jump to the diff" in js                             # run detail
     assert "Commands that differ only in spacing are grouped" in js and '"What", "Result"' not in js

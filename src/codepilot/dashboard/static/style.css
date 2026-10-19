@@ -66,3 +66,12 @@ td details > summary { font-weight: normal; }
 .bar { display: flex; gap: 2px; margin: 6px 0; font-size: 12px; }
 .bar .seg { padding: 2px 6px; border-radius: 4px; color: #fff; white-space: nowrap; min-width: fit-content; }
 .bar .solved { background: var(--ok); } .bar .declined { background: #8250df; } .bar .failed { background: var(--bad); } .bar .open { background: #6e7781; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; margin: 8px 0; }
+.tile { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
+.tile b { font-size: 20px; }
+.headline-tile b { font-size: 24px; }
+.tile.part { border-left-width: 6px; }
+.part.solver, .seg.solver { border-left-color: #2f81f7; } .seg.solver { background: #2f81f7; }
+.part.screen, .seg.screen { border-left-color: #8250df; } .seg.screen { background: #8250df; }
+.part.improve, .seg.improve { border-left-color: #1a7f37; } .seg.improve { background: #1a7f37; }
+.part.review, .seg.review { border-left-color: #d29922; } .seg.review { background: #d29922; }

@@ -176,17 +176,34 @@ const render = {
                     : el("p", "Version comparison appears once a newer repo-skill version has runs.", "muted")]));
     m.appendChild(grid);
 
-    // Cost
+    // Cost: blocks, not sentences — headline totals, one block per part, and a bar of each part's share
     const u = d.usage, cost = d.cost_usd;
-    const costLines = [big(cost === null || cost === undefined ? "not tracked" : "$" + cost,
-      cost && iss.solved ? "total · $" + (cost / iss.solved).toFixed(2) + " per solved issue" : "total")];
+    const costPanel = el("section", null, "panel cost");
+    costPanel.appendChild(el("h3", "Cost and tokens" + (u ? " (LangSmith traces)" : "")));
+    const tile = (label, value, lines, cls) => { const t = el("div", null, "tile " + (cls || "")); t.appendChild(el("span", label, "muted small"));
+      t.appendChild(el("b", value)); (lines || []).forEach(l => t.appendChild(el("span", l, "small"))); return t; };
+    const head = el("div", null, "tiles");
+    head.appendChild(tile("Total", cost === null || cost === undefined ? "not tracked" : "$" + cost, [], "headline-tile"));
+    head.appendChild(tile("Per solved issue", cost && iss.solved ? "$" + (cost / iss.solved).toFixed(2) : "—", [plural(iss.solved || 0, "solved issue")], "headline-tile"));
+    costPanel.appendChild(head);
     if (u) {
-      const sum = o => Object.values(o || {}).reduce((a, x) => a + (x.cost || 0), 0);
-      costLines.push("Solver agents $" + sum(u.runs).toFixed(2) + " · injection screen $" + (u.screen?.cost || 0).toFixed(3) +
-        " · self-improvement $" + (u.improvement?.cost || 0).toFixed(3) + " · reviewer $" + (u.reviewer?.cost || 0).toFixed(3) + " (" + plural(u.reviewer?.count || 0, "review") + ")");
-      costLines.push(el("p", "Tokens in / out: " + num(d.tokens_in) + " / " + num(d.tokens_out) + " (solver) · source: LangSmith traces", "muted"));
-    } else costLines.push(el("p", "Set LANGSMITH_API_KEY (LangSmith prices every model call) or add model prices to codepilot.yml.", "muted"));
-    m.appendChild(panel("Cost", "", costLines));
+      const agg = o => Object.values(o || {}).reduce((a, x) => ({ cost: a.cost + (x.cost || 0), tokens_in: a.tokens_in + (x.tokens_in || 0), tokens_out: a.tokens_out + (x.tokens_out || 0) }), { cost: 0, tokens_in: 0, tokens_out: 0 });
+      const parts = [
+        ["Solver agents", "solver", agg(u.runs), plural(Object.keys(u.runs || {}).length, "run")],
+        ["Injection screen", "screen", u.screen || {}, plural(u.screen?.count || 0, "issue screened")],
+        ["Self-improvement", "improve", u.improvement || {}, plural(u.improvement?.count || 0, "gap report")],
+        ["Independent reviewer", "review", u.reviewer || {}, plural(u.reviewer?.count || 0, "PR review")]];
+      const total = parts.reduce((a, p) => a + (p[2].cost || 0), 0) || 1;
+      const bar = el("div", null, "bar costbar");
+      parts.forEach(([label, cls, x]) => { if (x.cost) { const seg = el("span", Math.round(100 * x.cost / total) + "%", "seg " + cls); seg.style.flex = String(x.cost); seg.title = label; bar.appendChild(seg); } });
+      costPanel.appendChild(bar);
+      const row = el("div", null, "tiles");
+      const money = c => !c ? "$0" : c < 0.001 ? "<$0.001" : "$" + c.toFixed(c >= 0.1 ? 2 : 3);
+      parts.forEach(([label, cls, x, count]) => row.appendChild(tile(label, money(x.cost || 0),
+        [count, num(x.tokens_in || 0) + " in · " + num(x.tokens_out || 0) + " out"], "part " + cls)));
+      costPanel.appendChild(row);
+    } else costPanel.appendChild(el("p", "Set LANGSMITH_API_KEY (LangSmith prices every model call) or add model prices to codepilot.yml.", "muted"));
+    m.appendChild(costPanel);
 
     // Fill Quality and the PR part of "Needs you" from the Pull requests data, without holding the page up
     api("prs").then(prs => {
