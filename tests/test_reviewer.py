@@ -120,8 +120,9 @@ def test_workflow_security_properties():
                                     and s["with"]["persist-credentials"] is False and "repository" not in s["with"] for s in review_checkouts)
     run_steps = " ".join(s.get("run", "") for s in jobs["review"]["steps"])
     assert "cp/.github/codepilot-review/review.py" in run_steps and "cp/.github/codepilot-review/requirements.txt" in run_steps
-    for job in jobs.values():
-        assert job["if"].startswith("github.event.pull_request.head.repo.full_name == github.repository")
+    for name in ("tests", "review"):                                   # same-repo path (fork PRs: review-fork, own test)
+        job = jobs[name]
+        assert "github.event.pull_request.head.repo.full_name == github.repository" in job["if"]
         for s in job["steps"]:
             if "uses" in s:
                 assert re.fullmatch(r"[\w-]+/[\w-]+@[0-9a-f]{40}", s["uses"]), s["uses"]
@@ -145,8 +146,8 @@ def test_human_approval_at_a_reviewed_commit_rechecks_merge_ready_without_a_new_
 
 def test_workflow_ignores_the_reviewers_own_reviews():
     wf = yaml.safe_load((ROOT / "reviewer" / "workflow.yml").read_text())
-    for job in wf["jobs"].values():
-        assert "github.event.review.user.login != vars.REVIEWER_LOGIN" in job["if"]
+    for name in ("tests", "review"):
+        assert "github.event.review.user.login != vars.REVIEWER_LOGIN" in wf["jobs"][name]["if"]
 
 
 def test_pending_label_asks_for_a_full_review_and_is_swapped_for_completed():
@@ -204,3 +205,42 @@ def test_reviewer_is_traced_to_its_own_langsmith_project_with_pr_metadata():
     assert "langsmith==" in (ROOT / "reviewer" / "requirements.txt").read_text()
     src = (ROOT / "reviewer" / "review.py").read_text()
     assert '"run_name": "independent-review"' in src and '"pr": pr_number' in src
+
+
+# --- fork PRs: reviewed without ever running their code ---------------------------------------------------------------
+def test_fork_prs_get_a_review_job_that_never_touches_their_code():
+    wf = yaml.safe_load((ROOT / "reviewer" / "workflow.yml").read_text())
+    on = wf[True] if True in wf else wf["on"]
+    assert sorted(on["pull_request_target"]["types"]) == ["labeled", "opened", "reopened", "synchronize"]
+    job = wf["jobs"]["review-fork"]
+    cond = job["if"]
+    assert "github.event_name == 'pull_request_target'" in cond and "github.event.pull_request.head.repo.full_name != github.repository" in cond
+    assert "additions + github.event.pull_request.deletions <= 2000" in cond                # cost guard against spam PRs
+    assert job["permissions"] == {} and "needs" not in job
+    text = yaml.safe_dump(job)
+    assert "head.sha" not in text and "head.ref" not in text and "download-artifact" not in text and "INSTALL" not in text
+    checkouts = [s for s in job["steps"] if s.get("uses", "").startswith("actions/checkout")]
+    assert checkouts and all(s["with"]["ref"] == "${{ github.event.pull_request.base.ref }}" and s["with"]["persist-credentials"] is False
+                             and s["with"]["sparse-checkout"].strip() == ".github/codepilot-review" for s in checkouts)
+    run_env = next(s for s in job["steps"] if "review.py" in s.get("run", ""))["env"]
+    assert run_env["FORK_PR"] == "true"
+    for name in ("tests", "review"):                                                        # same-repo path only on pull_request
+        assert "github.event_name != 'pull_request_target'" in wf["jobs"][name]["if"]
+    assert "cancel-in-progress" in yaml.safe_dump(wf.get("concurrency", {}))
+
+
+def test_a_fork_pr_is_reviewed_but_never_marked_merge_ready():
+    pr = FakePR(labels=[]); pr.user = NS(login="stranger")
+    out = rv.run(FakeRepo(pr), 7, FakeClaude(responses=[tool_call("ReviewResult", REVIEW, "1")]), rv.TestSummary(),
+                 "rev[bot]", "codepilot-plus[bot]", fork=True)
+    body = pr.created[0][1]
+    assert out["ready"] is False and "merge-ready" not in pr.added and "fork" in " ".join(out["why"])
+    assert "tests not run" in body.lower() and "codepilot-review-completed" in pr.added
+
+
+def test_every_action_in_every_job_is_pinned_to_a_commit():
+    wf = yaml.safe_load((ROOT / "reviewer" / "workflow.yml").read_text())
+    for name, job in wf["jobs"].items():
+        for s in job["steps"]:
+            if "uses" in s:
+                assert re.fullmatch(r"[\w-]+/[\w-]+@[0-9a-f]{40}", s["uses"]), (name, s["uses"])
