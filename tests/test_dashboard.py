@@ -348,3 +348,23 @@ def test_cli_dashboard_wires_read_only_lessons(tmp_path, monkeypatch):
 def test_improvements_trend_labels_runs_without_a_skill():
     js = (Path(__file__).parents[1] / "src" / "codepilot" / "dashboard" / "static" / "app.js").read_text()
     assert "ended before the skill loaded" in js
+
+
+def test_overview_summarises_skills_per_task_and_repo_skill_versions(env):
+    from codepilot.improve.gaps import ImprovementStore
+    from codepilot.improve.repo_skill import RepoSkillStore
+    sk = env.client.get("/api/overview", headers=H).json()["skills"]
+    assert sk["by_task"] == [{"task_type": "bug_fix", "runs": 1, "outcomes": {"PR_OPENED": 1}}]
+    assert sk["repos"] == [{"repo": "o/r", "version": 0, "waiting": 0, "approved": 0}]      # no repo skill yet
+    ImprovementStore(env.conn, RepoSkillStore(env.conn))
+    env.conn.execute("insert into repo_skill_versions(repo, version, steps_json, change) values('o/r', 2, '[]', 'x')")
+    env.conn.executemany("insert into repo_skill_proposals(id, repo, key, op, section, text, evidence, status) values(?, 'o/r', ?, 'add', 's', 't', 'e', ?)",
+                         [("p1", "k1", "pending"), ("p2", "k2", "approved"), ("p3", "k3", "merged")])
+    assert env.client.get("/api/overview", headers=H).json()["skills"]["repos"] == [{"repo": "o/r", "version": 2, "waiting": 1, "approved": 1}]
+    js = (Path(__file__).parents[1] / "src" / "codepilot" / "dashboard" / "static" / "app.js").read_text()
+    assert "Skills at a glance" in js
+
+
+def test_runs_page_url_is_runs_and_old_matrix_links_still_work():
+    js = (Path(__file__).parents[1] / "src" / "codepilot" / "dashboard" / "static" / "app.js").read_text()
+    assert '["runs", "Runs"' in js and 'matrix: "runs"' in js and '"#matrix"' not in js

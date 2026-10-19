@@ -2,7 +2,7 @@
 // Every value from GitHub or an agent is set with textContent: no HTML is ever built from data.
 const PAGES = [
   ["overview", "Overview", "Totals across every run CodePilot+ has done."],
-  ["matrix", "Runs", "Every run and the stages it reached. Click a run ID for its diff, log and analysis."],
+  ["runs", "Runs", "Every run and the stages it reached. Click a run ID for its diff, log and analysis."],
   ["prs", "Pull requests", "Open pull requests with the independent review. Merge needs a current review that says merge-ready."],
   ["safety", "Safety", "What the guardrails refused or held back, and the measured injection screen."],
   ["context", "Context", "How much context each run was given: repo map size against its budget, lessons recalled, skill used."],
@@ -91,7 +91,7 @@ const render = {
     if (d.cost_usd === null) m.appendChild(el("p", "Cost is not tracked: set LANGSMITH_API_KEY (LangSmith prices every model call) or add price_in_per_mtok and price_out_per_mtok to codepilot.yml.", "muted"));
     m.appendChild(table(["Status", "Runs"], Object.entries(d.by_state).map(([k, v]) => [status(k), num(v)])));
   },
-  async matrix(m) {
+  async runs(m) {
     const d = await api("matrix");
     m.appendChild(table(["Run", "Issue", "Outcome", "Cost", "Title", "Type", ...d.stages], d.rows.map(r => [
       td(runLink(r.run_id)), r.repo.split("/").pop() + " " + r.issue,
@@ -159,7 +159,7 @@ const render = {
     m.appendChild(table(["Repo", "Type", "Source", "Lesson"], all));
     m.appendChild(el("h2", "Recent sessions"));
     const note = el("p", "Each summary is a snapshot taken when that session ended. For each run's current status, see ", "muted");
-    const toRuns = el("a", "Runs"); toRuns.href = "#matrix"; note.appendChild(toRuns); note.appendChild(document.createTextNode(".")); m.appendChild(note);
+    const toRuns = el("a", "Runs"); toRuns.href = "#runs"; note.appendChild(toRuns); note.appendChild(document.createTextNode(".")); m.appendChild(note);
     const sessions = d.sessions.filter(s => s.summary && s.summary !== "no runs");
     m.appendChild(table(["Started", "Summary (at session end)"], sessions.map(s => [when(s.started), tdTitle(short(friendlySummary(s.summary), 120), friendlySummary(s.summary))])));
   },
@@ -198,7 +198,7 @@ async function showRun(id) {
   setActive(""); const m = document.getElementById("main"); loading(m);
   try {
     const d = await api("runs/" + encodeURIComponent(id)); clear(m);
-    const back = el("a", "← Back to runs", "back"); back.href = "#matrix"; m.appendChild(back);
+    const back = el("a", "← Back to runs", "back"); back.href = "#runs"; m.appendChild(back);
     m.appendChild(el("h2", d.run.repo + " " + d.run.issue_key + " — " + d.run.title));
     m.appendChild(el("p", "Now: " + status(d.run.state) + " · " + (d.run.task_type || "").replace(/_/g, " ") + " · complexity " + (d.run.complexity ?? "") + "/10"));
     const why = [d.run.reason || ""].concat((d.errors || []).map(x => "Full error (end of output):\n" + x)).filter(Boolean).join("\n\n");
@@ -225,10 +225,11 @@ async function show(page) {
   catch (e) { wait.remove(); m.appendChild(el("p", "Could not load: " + e.message)); }
 }
 
+const ALIASES = { matrix: "runs" };      // old links (#matrix) still open the Runs page
 function route() {
   const h = new URLSearchParams(location.hash.slice(1));
   if (h.get("run")) return showRun(h.get("run"));
-  const page = location.hash.slice(1);
+  const page = ALIASES[location.hash.slice(1)] || location.hash.slice(1);
   return show(PAGES.some(p => p[0] === page) ? page : "overview");
 }
 
