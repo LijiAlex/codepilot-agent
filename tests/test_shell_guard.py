@@ -48,3 +48,20 @@ def test_refusals_are_logged_with_the_rule_name(tmp_path):
     agent.invoke({"messages": [{"role": "user", "content": "x"}]}, {"configurable": {"thread_id": "t"}})
     row = audit.conn.execute("select detail_json from events where action='command_refused'").fetchone()
     assert json.loads(row["detail_json"])["rule"] == "pip-install"
+
+
+def test_a_variant_of_an_approved_command_does_not_ask_again(tmp_path):
+    # live 2026-10-19, issue #9: `make lint` approved, the agents then ran it combined differently and were stopped again
+    audit = AuditLog(connect(tmp_path / "cp.db"))
+    guard = make_shell_guard(audit, run_id="r1", agent="test-agent", approved_commands=frozenset({"make lint"}))
+    agent = create_deep_agent(model=FakeClaude(responses=[tool_call("execute", {"command": "cd . && make lint"}, "1"),
+                                                          AIMessage(content="ok")]), middleware=[guard],
+                              backend=LocalShellBackend(root_dir=str(tmp_path), env={"PATH": "/usr/bin:/bin"}),
+                              checkpointer=InMemorySaver())
+    seen = []
+    for ns, mode, data in agent.stream({"messages": [{"role": "user", "content": "x"}]}, {"configurable": {"thread_id": "t"}},
+                                       stream_mode=["updates"], subgraphs=True):
+        if isinstance(data, dict) and "__interrupt__" in data:
+            seen += [i.value for i in data["__interrupt__"]]
+    assert seen == []
+    assert audit.conn.execute("select count(*) from events where action='command_needs_decision'").fetchone()[0] == 0

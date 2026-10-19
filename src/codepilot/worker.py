@@ -117,6 +117,7 @@ class Seed:
     prior_failures: int = 0
     saved: list[dict] = field(default_factory=list)
     approved_command: str | None = None
+    approved: list[str] = field(default_factory=list)   # command parts a person approved earlier in this run
     plan_text: str = ""
     plan_approved: bool = False
     notes: str = ""
@@ -330,7 +331,7 @@ class Worker:
                 issue_tool=make_read_claimed_issue_tool(item.issue) if item.issue else None,
                 searcher=self._searcher(repo, mpath, base_sha, entries), lessons=lessons, repo_skill=rs_text,
                 plan_text=(seed.plan_text + ("\n" + notes if notes else "")).strip(),
-                approved_commands=frozenset(),        # an approved command is run once, by code, above (spec E10)
+                approved_commands=frozenset(seed.approved),   # approved parts (e.g. `make lint`) stay allowed for the run
                 max_model_calls=s.settings.max_model_calls_per_run, max_tool_calls=s.settings.max_tool_calls_per_run,
                 reinstall=(lambda: provider.reinstall(handle, repo.install_command)) if repo.install_command else None,
                 protected_paths=list(repo.protected_paths), top_k=s.settings.top_k)
@@ -367,6 +368,7 @@ class Worker:
             saved = capture_changes(handle.backend, base_sha)
             self._facts[run_id]["files"] = [x.path for x in saved]
             common = {"saved": to_payload(saved), "base_sha": base_sha, "triage": tr.model_dump(), **item.payload(),
+                      "approved": list(seed.approved),
                       "diff": unified_diff(mpath, base_sha, saved), "test_report":
                       asdict(attempts.verified or attempts.last_report) if (attempts.verified or attempts.last_report) else None}
             if translator.interrupts:

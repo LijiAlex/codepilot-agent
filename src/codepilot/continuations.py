@@ -10,6 +10,7 @@ from typing import Any, Callable
 from codepilot.agents.triage import ComplexPlan, plan_as_todos
 from codepilot.gh.reader import IssueSnapshot
 from codepilot.publish import PublishOutcome, PublishServices, publish, recheck_issue
+from codepilot.safety.commands import unknown_parts
 from codepilot.states import ACTIVE, IN_FLIGHT, RunState
 from codepilot.worker import Seed, WorkItem
 
@@ -93,7 +94,8 @@ def _apply(cs: ContinuationServices, h, handoff_id: str, decision: str, by: str,
         ps.runs.set_state(h["run_id"], RunState.CLOSED, f"stale: {stale}")
         return DecisionResult("stale", stale)
 
-    common = dict(base_sha=payload.get("base_sha"), triage=payload.get("triage"), saved=payload.get("saved", []))
+    common = dict(base_sha=payload.get("base_sha"), triage=payload.get("triage"), saved=payload.get("saved", []),
+                  approved=list(payload.get("approved", [])))
     if entry == "continue_fix":
         if decision == "reject":                         # spec §10: reject → FAILED, lesson
             ps.runs.set_state(h["run_id"], RunState.FAILED, "rejected")
@@ -110,6 +112,7 @@ def _apply(cs: ContinuationServices, h, handoff_id: str, decision: str, by: str,
     if entry == "continue_with_decision":
         cmd = payload["gate"]["command"]
         if decision == "approve":
+            common["approved"] = sorted(set(common["approved"]) | unknown_parts(cmd))
             seed = Seed(**common, prior_failures=payload.get("prior_failures", 0), approved_command=cmd)
         else:
             seed = Seed(**common, prior_failures=payload.get("prior_failures", 0),

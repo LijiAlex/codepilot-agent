@@ -66,3 +66,14 @@ def test_only_push_download_install_refusals_carry_the_publishing_hint():
 def test_every_refusal_names_the_rule_that_fired(cmd, rule):
     from codepilot.safety.commands import rule_for
     assert rule_for(classify_command(cmd).reason) == rule
+
+
+def test_an_approved_part_is_allowed_in_any_combination_but_nothing_else():
+    from codepilot.safety.commands import unknown_parts
+    approved = unknown_parts("cd sandbox && make lint; echo exit=$?")          # live 2026-10-19, issue #9
+    assert approved == frozenset({"make lint"})
+    assert classify_command("cd sandbox && make lint", approved).kind == "allowed"
+    assert classify_command("cd sandbox && make lint; grep -n python Makefile", approved).kind == "allowed"
+    assert classify_command("make test", approved).kind == "unknown"                 # only what was approved
+    assert classify_command("make lint && rm -rf build", approved).kind == "blocked"  # approval never unblocks
+    assert classify_command("cd sandbox && make lint").kind == "unknown"             # nothing approved: still asks

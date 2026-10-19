@@ -86,7 +86,20 @@ def _segment(seg: str) -> Classification:
     return Classification("unknown", f"{prog} is not on the allowed or blocked list")
 
 
-def classify_command(cmd: str) -> Classification:
+def _norm(seg: str) -> str:
+    try:
+        return shlex.join(shlex.split(seg))
+    except ValueError:
+        return seg.strip()
+
+
+def unknown_parts(cmd: str) -> frozenset[str]:
+    """The parts of a command a person is asked about (e.g. `make lint` in `cd sandbox && make lint; echo x`).
+    Approving the command approves these parts for the rest of the run, in any combination."""
+    return frozenset(_norm(s) for s in _SPLIT.split(cmd.strip()) if s and _segment(s).kind == "unknown")
+
+
+def classify_command(cmd: str, approved: frozenset[str] = frozenset()) -> Classification:
     if "\n" in cmd or "\r" in cmd:
         return Classification("blocked", "multi-line commands are not allowed; run one command at a time")
     if re.search(r"(?<![&>])&(?![&>])", cmd):           # a lone & runs the next command in the background
@@ -95,7 +108,10 @@ def classify_command(cmd: str) -> Classification:
         return Classification("blocked", "command substitution is not allowed")
     if re.search(r"[<>]", re.sub(r"\d?>&\d", "", cmd)):     # any redirection except 2>&1-style stream joins
         return Classification("blocked", "redirection is not allowed; use the file tools")
-    results = [_segment(s) for s in _SPLIT.split(cmd.strip()) if s]
+    segs = [s for s in _SPLIT.split(cmd.strip()) if s]
+    results = [_segment(s) for s in segs]
+    results = [Classification("allowed", "approved by a person") if r.kind == "unknown" and _norm(s) in approved else r
+               for s, r in zip(segs, results)]          # approval covers exactly the approved part; blocked stays blocked
     for kind in ("blocked", "unknown"):
         for r in results:
             if r.kind == kind:

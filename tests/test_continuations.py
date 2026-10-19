@@ -132,3 +132,18 @@ def test_continuation_superseded_when_the_poller_claimed_first(env, monkeypatch)
     monkeypatch.setattr(env.runs, "claim", lambda *a, **k: None)
     r = decide(env.cs, hid, "approve", "liji")
     assert r.status == "superseded" and r.continuation is None and env.runs.get(rid)["state"] == "CLOSED"
+
+
+def test_approved_command_parts_carry_through_later_continuations(env):
+    # live 2026-10-19, issue #9: the approval must cover `make lint` for the rest of the run, not one exact string
+    gate = {"gate": "unexpected_command", "command": "cd sandbox && make lint; echo exit=$?", "agent": "coder", "reason": "x"}
+    _, hid = waiting(env, "continue_with_decision", {"gate": gate, "approved": ["make build"]})
+    ok = decide(env.cs, hid, "approve", "liji")
+    assert ok.continuation.seed.approved == ["make build", "make lint"]
+    env.runs.set_state(ok.continuation.run_id, RunState.FAILED, "x")
+    _, hid2 = waiting(env, "continue_with_decision", {"gate": {**gate, "command": "make docs"}, "approved": ["make lint"]})
+    no = decide(env.cs, hid2, "reject", "liji")
+    assert no.continuation.seed.approved == ["make lint"]                          # a refusal keeps earlier approvals
+    env.runs.set_state(no.continuation.run_id, RunState.FAILED, "x")
+    _, hid3 = waiting(env, "continue_fix", {"prior_failures": 2, "approved": ["make lint"], "test_report": {}})
+    assert decide(env.cs, hid3, "approve", "liji").continuation.seed.approved == ["make lint"]
