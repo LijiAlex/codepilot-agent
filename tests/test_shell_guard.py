@@ -32,3 +32,11 @@ def test_unknown_command_interrupts(tmp_path):
         if isinstance(data, dict) and "__interrupt__" in data:
             seen += [i.value for i in data["__interrupt__"]]
     assert seen and seen[0]["gate"] == "unexpected_command" and seen[0]["command"] == "docker build ."
+
+def test_refusal_message_matches_the_reason(tmp_path):
+    agent, _ = _agent(tmp_path, [tool_call("execute", {"command": "python -c \"print(1)\""}, "1"),
+                                 tool_call("execute", {"command": "pip install x"}, "2"), AIMessage(content="ok")])
+    out = agent.invoke({"messages": [{"role": "user", "content": "x"}]}, {"configurable": {"thread_id": "t"}})
+    inline, pip = [m.content for m in out["messages"] if m.type == "tool"]
+    assert inline.startswith("refused by CodePilot+ guard: inline python is not allowed") and "install" not in inline
+    assert "do not try to push, download or install" in pip

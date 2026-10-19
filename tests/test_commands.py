@@ -39,3 +39,18 @@ def test_blocked_guard_bypasses(cmd):
 @pytest.mark.parametrize("cmd", ["timeout 60 python -m pytest -q", "time pytest -q", "python -m pytest -q 2>&1 | tail -5"])
 def test_wrappers_classified_by_wrapped_command(cmd):
     assert classify_command(cmd).kind == "allowed"
+
+
+def test_refusal_reason_names_the_real_problem_not_the_quotes():
+    # run 9705eaa62840: the ; inside the quotes split the command and the guard said "unparseable command"
+    c = classify_command('cd sandbox && python -c "import pydantic;print(pydantic.VERSION)"')
+    assert c.kind == "blocked" and c.reason == "inline python is not allowed"
+    q = classify_command('grep "a;b" file.py')          # still blocked (behaviour unchanged), with an honest reason
+    assert q.kind == "blocked" and "inside quotes" in q.reason
+    assert classify_command('echo "oops').reason == "unparseable command (unbalanced quotes)"
+
+
+def test_only_push_download_install_refusals_carry_the_publishing_hint():
+    assert classify_command("pip install x").hint and classify_command("git push origin main").hint
+    assert classify_command("curl http://x").hint and classify_command("python -m pip --version").hint
+    assert not classify_command('python -c "1"').hint and not classify_command("rm -rf x").hint

@@ -19,8 +19,7 @@ def make_shell_guard(audit: AuditLog, run_id: str, agent: str, approved_commands
         c = classify_command(cmd)
         if c.kind == "blocked":
             audit.log(f"agent:{agent}", "command_refused", run_id=run_id, target=cmd, result="refused", detail={"reason": c.reason})
-            return ToolMessage(content=f"refused by CodePilot+ guard: {c.reason}. Publishing happens after human approval; "
-                                       f"do not try to push, download or install.",
+            return ToolMessage(content=f"refused by CodePilot+ guard: {c.reason}." + (f" {c.hint}" if c.hint else ""),
                                name="execute", tool_call_id=call["id"], status="error")
         if c.kind == "unknown" and cmd not in approved_commands:
             audit.log(f"agent:{agent}", "command_needs_decision", run_id=run_id, target=cmd, result="paused", detail={"reason": c.reason})
