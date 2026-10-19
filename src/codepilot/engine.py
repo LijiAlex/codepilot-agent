@@ -59,6 +59,7 @@ class Engine:
         self.stop_event, self.poll_now = threading.Event(), threading.Event()
         self.current_run: str | None = None
         self.last_poll: dict[str, str] = {}             # issue → why it was skipped in the last poll
+        self.polled_at: float | None = None             # epoch seconds of the last finished poll (TUI title)
         self.stats: Counter[str] = Counter()
         self.threads: list[threading.Thread] = []
         worker.s.on_run_end = self._on_run_end
@@ -190,6 +191,7 @@ class Engine:
     def poll_once(self) -> None:
         res = self.poller.poll()
         self.last_poll = dict(res.skipped)
+        self.polled_at = time.time()
         for item, rid in res.claimed:
             self.jobs.put(Job(item, rid))
         self.watcher.check()
@@ -233,7 +235,8 @@ class Engine:
         return {"runs": [dict(r) for r in runs.recent(40)],
                 "pending": pending,
                 "current": dict(cur) if cur else None, "skipped": dict(self.last_poll),
-                "repos": [r.full_name for r in self.settings.repos]}
+                "repos": [r.full_name for r in self.settings.repos], "polled_at": self.polled_at,
+                "poll_interval_s": self.settings.poll_interval_s, "map_budget": self.settings.repo_map_budget_tokens}
 
     # ---- session memory ----------------------------------------------------
     def _on_run_end(self, out: Outcome) -> None:

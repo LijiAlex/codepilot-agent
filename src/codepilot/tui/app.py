@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import getpass
 from collections import deque
+from datetime import datetime
 from typing import Callable
 
 from rich.markup import escape
@@ -15,6 +16,7 @@ from textual.containers import Container, Vertical
 from textual.widgets import DataTable, Footer, Label, ListItem, ListView, RichLog, Static
 
 from codepilot.engine import UiCallbacks
+from codepilot.safety.commands import rule_for
 from codepilot.tui.screens import ConfirmScreen, InspectScreen, LogScreen, NewTaskScreen, ReasonScreen
 
 STATE_ICON = {"DONE": "✓", "FAILED": "✗", "SKIPPED": "–", "CLOSED": "■", "AWAITING_APPROVAL": "⚠", "PR_OPENED": "⇪"}
@@ -22,7 +24,8 @@ ENTRY_LABEL = {"publish": "Open PR to main (PR-to-main / git push gate)", "publi
                "continue_fix": "Retry after 2 failed test runs", "continue_with_decision": "Unexpected command",
                "continue_complex": "Complex issue — plan"}
 KIND_STYLE = {"tool_call": "cyan", "tool_result": "dim", "message": "white", "state": "bold yellow",
-              "interrupt": "bold magenta", "notice": "yellow", "error": "bold red"}
+              "interrupt": "bold magenta", "notice": "yellow", "error": "bold red", "blocked": "bold red"}
+GUARD_PREFIX = "refused by CodePilot+ guard: "
 
 
 def _short(repo: str) -> str:
@@ -62,6 +65,8 @@ class CodePilotApp(App):
         self.lines: list[tuple[str, str]] = []
         self.last_agent: dict[str, str] = {}
         self.todos: dict[str, list] = {}
+        self.context: dict[str, dict] = {}                 # run id → its context notice (repo map, lessons, repo skill)
+        self.calls: dict[str, str] = {}                    # tool call id → command, to name what the guard refused
         self.pending: list[dict] = []
         self.issue_rows: list[dict] = []
 
@@ -126,6 +131,12 @@ class CodePilotApp(App):
                 continue
             if e.kind == "tool_call" and e.data.get("name") == "write_todos":
                 self.todos[e.run_id] = e.data.get("args", {}).get("todos", [])
+            if e.kind == "tool_call" and e.data.get("name") == "execute":
+                self.calls[e.data.get("id", "")] = str((e.data.get("args") or {}).get("command", ""))
+            if e.kind == "notice" and (e.data or {}).get("kind") == "context":
+                self.context[e.run_id] = e.data
+            if e.kind == "tool_result" and str(e.text).startswith(GUARD_PREFIX):
+                self._guard_block(e)
             kind = "error" if e.kind == "tool_result" and e.data.get("status") == "error" else e.kind
             self._log(kind, e.agent, e.text)
             if e.kind in ("state", "interrupt"):
@@ -134,6 +145,14 @@ class CodePilotApp(App):
             self._log("message", agent, text.strip()[:400])
         if tokens or self.lines:
             self._render_task()
+
+    def _guard_block(self, e) -> None:
+        """Make a guard refusal hard to miss: its own red line naming the command and the rule, plus a toast."""
+        reason = str(e.text)[len(GUARD_PREFIX):]
+        cmd = self.calls.pop((e.data or {}).get("tool_call_id", ""), "")
+        text = f"⛔ blocked ({e.agent}): {cmd or 'command'} — rule {rule_for(reason)}"
+        self._log("blocked", "guardrail", text)
+        self.notify(text, severity="warning", timeout=6)
 
     def _log(self, kind: str, agent: str, text: str) -> None:
         plain = f"[{agent}] {text}"
@@ -144,6 +163,8 @@ class CodePilotApp(App):
     # ---- views -------------------------------------------------------------
     def refresh_view(self) -> None:
         v = self.engine.view()
+        self._poll_title(v)
+        self.map_budget = v.get("map_budget") or 4000
         table = self.query_one("#issues", DataTable)
         keep = self.issue_rows[table.cursor_row] if 0 <= table.cursor_row < len(self.issue_rows) else None
         self._refreshing = True                               # rebuilding moves the cursor: not a person choosing a row
@@ -182,9 +203,12 @@ class CodePilotApp(App):
         approvals.clear()
         self.pending = v["pending"]
         for h in self.pending:
-            label = f"⚠ {h['repo']} {h['issue_key']}: {ENTRY_LABEL.get(h['entry_point'], h['entry_point'])}"
+            short = "open PR to main" if h["entry_point"] == "publish" else ENTRY_LABEL.get(h["entry_point"], h["entry_point"])
+            label = f"⚠ {_short(h['repo'])} {h['issue_key']}: {short}"       # full gate name on the Selected: line
+            if h["entry_point"] == "publish" and h.get("file_count"):
+                label += f" — {h['file_count']} file{'s' if h['file_count'] != 1 else ''} changed"
             if "more_than_5_files" in h.get("flags", []):          # brief gate: commit touching more than 5 files (E18)
-                label += f" — commit touches {h.get('file_count', '?')} files (>5-file gate)"
+                label += " (>5-file gate)"
             approvals.append(ListItem(Label(Text(label))))
         ids = [h["id"] for h in self.pending]
         idx = ids.index(keep) if keep in ids else (0 if ids else None)
@@ -208,7 +232,26 @@ class CodePilotApp(App):
         todo_lines = "\n".join(f"  [{'✓' if t.get('status') == 'completed' else ' '}] {t.get('content', '')}" for t in todos)
         box.update(Text(f"{cur['issue_key']}: {cur['title']}\nStatus: {cur['state']}\n"
                         f"Agent: {self.last_agent.get(cur['id'], '-')} (retry {cur.get('attempts') or 0}/3)\n"
-                        f"Skill: {cur.get('skill') or '-'}\nTodo:\n{todo_lines or '  (not planned yet)'}"))
+                        f"Skill: {cur.get('skill') or '-'}\n{self._context_line(cur['id'])}"
+                        f"Todo:\n{todo_lines or '  (not planned yet)'}"))
+
+    def _context_line(self, run_id: str) -> str:
+        c = self.context.get(run_id)
+        if not c:
+            return ""
+        n = int(c.get("lessons") or 0)
+        skill = f" · repo skill v{c['repo_skill_version']}" if c.get("repo_skill_version") else ""
+        return (f"Context: repo map {int(c.get('map_tokens') or 0):,} / {getattr(self, 'map_budget', 4000):,} tokens · "
+                f"{n} lesson{'' if n == 1 else 's'} recalled{skill}\n")
+
+    def _poll_title(self, v: dict) -> None:
+        at, every = v.get("polled_at"), v.get("poll_interval_s")
+        if not at or not every:
+            return
+        nxt = datetime.fromtimestamp(at + every).strftime("%H:%M")
+        mins = f"{every // 60} min" if every % 60 == 0 else f"{every} s"
+        self.query_one("#issues-panel Label", Label).update(
+            f"GitHub Issues · polled {datetime.fromtimestamp(at).strftime('%H:%M:%S')} · next {nxt} (every {mins})")
 
     # ---- actions -----------------------------------------------------------
     def _describe(self, h: dict) -> str:

@@ -45,14 +45,15 @@ async def test_four_panels_show_issues_task_logs_and_approvals():
                                  {"name": "write_todos", "args": {"todos": [{"content": "Reproduce", "status": "completed"},
                                                                             {"content": "Fix", "status": "pending"}]}}))
         eng.ui.on_event(RunEvent("r1", "tool_result", "coder", "refused by CodePilot+ guard: git push", {"status": "error"}))
-        await pilot.pause(0.3)
+        a.flush_logs(); await pilot.pause()            # flush now rather than wait for the 10 Hz timer (load-proof)
         task = str(a.query_one("#task", Static).render())
         assert "Status: IMPLEMENTING" in task and "Agent: coder (retry 1/3)" in task and "[✓] Reproduce" in task and "[ ] Fix" in task
         assert any("refused by CodePilot+ guard" in plain for plain, _ in a.lines)
         items = a.query_one("#approvals", ListView).children
         assert len(items) == 1
         text = str(items[0].query_one(Label).render())
-        assert "PR-to-main / git push gate" in text and "commit touches 9 files (>5-file gate)" in text
+        assert "open PR to main — 9 files changed (>5-file gate)" in text
+        assert "PR-to-main / git push gate" in str(a.query_one("#approval-hint", Static).render())
 
 
 @pytest.mark.anyio
@@ -213,7 +214,7 @@ async def test_log_lines_wrap_to_a_narrow_panel_instead_of_scrolling_sideways():
     async with a.run_test(size=(110, 35)) as pilot:                   # panel narrower than 78 columns
         await pilot.pause()
         a.on_notice("approve: published — https://github.com/LijiAlex/codepilot-playground/pull/15 and a long tail of words here")
-        await pilot.pause(0.3)
+        a.flush_logs(); await pilot.pause()            # flush now rather than wait for the 10 Hz timer (load-proof)
         log = a.query_one("#logs", RichLog)
         assert log.scroll_x == 0 and log.virtual_size.width <= log.scrollable_content_region.width
 
@@ -233,3 +234,27 @@ async def test_arrow_keys_switch_the_past_log_and_refreshes_keep_the_cursor():
         assert "log of r2" in text() and "log of r1" not in text()
         a.refresh_view(); await pilot.pause(0.3)                     # a poll or run event refreshes the screen
         assert t.cursor_row == 1 and "log of r2" in text()          # cursor and log stay on #2
+
+
+@pytest.mark.anyio
+async def test_demo_visibility_polling_context_guardrail_block_and_file_count():
+    a, eng = app()
+    eng.state |= {"polled_at": 1_800_000_000.0, "poll_interval_s": 300, "map_budget": 4000}
+    eng.state["pending"].append({"id": "h2", "repo": "o/r", "issue_key": "#8", "entry_point": "publish", "flags": [], "file_count": 2})
+    async with a.run_test(size=(160, 40)) as pilot:
+        await pilot.pause()
+        title = str(a.query_one("#issues-panel Label", Label).render())
+        assert "polled" in title and "next" in title and "every 5 min" in title
+        eng.ui.on_event(RunEvent("r1", "notice", "worker", "context", {"kind": "context", "map_tokens": 2530, "lessons": 1,
+                                                                      "skill": "bug_fix_skill", "repo_skill_version": 2}))
+        eng.ui.on_event(RunEvent("r1", "tool_call", "coder", "execute(...)",
+                                 {"name": "execute", "args": {"command": "rm -rf build"}, "id": "c1"}))
+        eng.ui.on_event(RunEvent("r1", "tool_result", "coder", "refused by CodePilot+ guard: deleting or running files by shell is not allowed; use the file tools.",
+                                 {"name": "execute", "status": "error", "tool_call_id": "c1"}))
+        a.flush_logs(); await pilot.pause()            # flush now rather than wait for the 10 Hz timer (load-proof)
+        task = str(a.query_one("#task", Static).render())
+        assert "Context: repo map 2,530 / 4,000 tokens · 1 lesson recalled · repo skill v2" in task
+        blocked = [p for p, _ in a.lines if p.startswith("[guardrail]")]
+        assert blocked and "rm -rf build" in blocked[0] and "delete-files" in blocked[0]
+        labels = [str(i.query_one(Label).render()) for i in a.query_one("#approvals", ListView).children]
+        assert "2 files changed" in labels[1] and ">5-file gate" not in labels[1]

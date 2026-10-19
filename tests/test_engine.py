@@ -146,3 +146,14 @@ def test_run_log_returns_the_last_lines_of_a_finished_run(env):
     log = e.run_log("abc123", limit=200)
     assert len(log) == 200 and log[-1]["text"] == "line 249" and log[0]["text"] == "line 50"
     assert e.run_log("nope") == []
+
+
+def test_view_says_when_it_last_polled_and_the_map_budget(env):
+    e, ui = engine(env)
+    assert e.view()["polled_at"] is None                         # not polled yet: the TUI keeps its plain title
+    e.poller.poll = lambda: type("R", (), {"skipped": {}, "claimed": []})()
+    e.watcher.check = lambda: None
+    e.poll_once()
+    v = e.view()
+    assert v["polled_at"] is not None and v["poll_interval_s"] == e.settings.poll_interval_s
+    assert v["map_budget"] == e.settings.repo_map_budget_tokens

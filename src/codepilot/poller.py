@@ -83,7 +83,7 @@ class Poller:
                         ps.audit.log("guardrail", "issue_blocked", run_id=rid, target=key,
                                      result="failed_closed" if snap.failed_closed else "blocked",
                                      detail={"reasons": snap.block_reasons[:5]})
-                        ps.on_notice(f"{cfg.full_name} {key} blocked: {reason}")
+                        ps.on_notice(f"⛔ {cfg.full_name} {key} blocked by the injection guardrail: {reason}")
                 res.skipped[key] = "blocked by the injection check"
                 continue
             rid = ps.runs.claim(cfg.full_name, "issue", cand.number, snap.title)
