@@ -202,7 +202,7 @@ const render = {
       quality.removeChild(quality.lastChild);
       quality.appendChild(reviewed.length ? big((avg(reviewed.map(p => p.review.fields.score))).toFixed(1) + "/10", "average independent review (" + plural(reviewed.length, "open PR") + ")") : el("p", "No open PR has an independent review yet.", "muted"));
       if (reviewed.length) quality.appendChild(el("p", "Merge-ready: " + reviewed.filter(p => p.review.fields.merge_ready).length + " of " + reviewed.length +
-        (weakest ? " · weakest rubric criterion: " + weakest[0] + " (" + weakest[1].toFixed(1) + "/2)" : "")));
+        (weakest && weakest[1] < 2 ? " · weakest rubric criterion: " + weakest[0] + " (" + weakest[1].toFixed(1) + "/2)" : " · every rubric criterion at 2/2")));
     }).catch(() => { prNeeds.textContent = "pull requests unavailable"; quality.removeChild(quality.lastChild); quality.appendChild(el("p", "GitHub did not answer; see Pull requests.", "muted")); });
   },
   async runs(m) {
