@@ -63,7 +63,7 @@ uv run codepilot selfcheck                                  # every agent has ex
 uv run codepilot replay examples/run-issue-25/events.jsonl  # the recorded run of issue #25 from the demo, step by step
 ```
 
-**To run it live, you need:** Python 3.12, [uv](https://docs.astral.sh/uv/), an Anthropic API key, a [LangSmith](https://smith.langchain.com/) API key for tracing, a [Daytona](https://www.daytona.io/) API key (or `sandbox: local` in `codepilot.yml` for a weaker macOS-only sandbox), and a GitHub App (see [Connect your own repository](#connect-your-own-repository)).
+**To run it live, you need:** Python 3.12, [uv](https://docs.astral.sh/uv/), an Anthropic API key, a [LangSmith](https://smith.langchain.com/) API key for tracing, an OpenAI API key for the independent reviewer, a [Daytona](https://www.daytona.io/) API key (or `sandbox: local` in `codepilot.yml` for a weaker macOS-only sandbox), and a GitHub App (see [Connect your own repository](#connect-your-own-repository)).
 
 ```bash
 cp .env.example .env                    # fill in your keys
@@ -96,7 +96,7 @@ Open two terminals:
 3. **Limit who can assign work:** in that entry in `codepilot.yml`, add `author_allowlist: [your-github-login]`. Without it, anyone's issue is accepted.
 4. **Label an issue** `ai-assignable` and start the terminal UI.
 
-**Add the independent reviewer (optional).** It needs a second GitHub App for the reviewer, an OpenAI key, and `gh` with the workflow scope (`gh auth refresh -s workflow`).
+**Add the independent reviewer.** It needs a second GitHub App for the reviewer, the OpenAI key, and `gh` with the workflow scope (`gh auth refresh -s workflow`).
 
 ```bash
 uv run python scripts/install_reviewer.py --repo OWNER/REPO --install "pip install -e . pytest"           # preview
