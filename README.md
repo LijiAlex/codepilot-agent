@@ -4,6 +4,11 @@
 
 Engineering teams lose hours every sprint to small, well-defined issues: a bug flagged by a test, a dependency bump, a missing paragraph in the docs. You label an issue `ai-assignable`; a team of AI agents finds the relevant code, makes the change in an isolated copy of the repository, runs the tests and prepares a pull request. Nothing reaches GitHub until you approve it.
 
+## CodePilot+ in 30 seconds
+
+<!-- On github.com: edit this file and drag docs/codepilot-pitch.mp4 onto this line; GitHub turns it into an inline player. -->
+▶ [Watch the 30-second pitch](docs/codepilot-pitch.mp4)
+
 ## Demo
 
 | | What it shows |
@@ -11,7 +16,8 @@ Engineering teams lose hours every sprint to small, well-defined issues: a bug f
 | ▶ [**Demo video**](https://youtu.be/-jkHc7YaXk8) (5 min) | Issue polling, a guardrail block, a full run from issue to pull request, the human approval, the independent review and the dashboard |
 | ▶ [**Architecture walk-through**](https://youtu.be/LpQGS6tEbiQ) (9 min) | Every box on the architecture diagram, explained in order |
 | 📄 [**Slide deck (PDF)**](docs/codepilot-deck.pdf) | The problem, one issue followed end to end, the evidence, the design decisions |
-| ▶ [30-second pitch](docs/codepilot-pitch.mp4) | CodePilot+ in 30 seconds |
+
+### Terminal UI
 
 ![The terminal UI: a poll runs, issue #13 is blocked by the injection screen, issue #25 is claimed and triaged](docs/tui.gif)
 
