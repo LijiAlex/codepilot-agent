@@ -74,13 +74,14 @@ function friendlySummary(text) {        // "FAILED(error: X): 1 | PR_OPENED: 2" 
     (m, st, _p, why, n) => status(st) + (why ? " (" + why.trim() + ")" : "") + " ×" + n);
 }
 const MARKS = { done: ["✓", ""], failed: ["✗", ""], voided: ["!", "Tests passed, but a later change was not re-tested, so the run stopped as untested"],
-  stopped: ["✗", "The run stopped at this stage"], unreached: ["–", "Never reached: the run stopped earlier"] };
+  stopped: ["✗", "The run stopped at this stage"], unreached: ["–", "Never reached: the run stopped earlier"],
+  skipped: ["skipped", "The Orchestrator went straight to the coder: the issue and the repo map already showed where the change goes"] };
 function markCell(mark, extra) { const [sym, why] = MARKS[mark] || ["", ""], c = el("td", sym); if (mark) c.className = mark; if (why) c.title = why + (extra ? ": " + extra : ""); return c; }
 function stageMarks(r, stages) {        // failed runs: the stage it stopped at (✗) vs the stages it never reached (–)
   const marks = stages.map(s => r.marks[s] || "");
   if (!["FAILED", "CLOSED"].includes(r.state)) return marks;
   let stop = marks.findIndex(m => m === "failed" || m === "voided");
-  if (stop < 0) { stop = marks.findIndex(m => m !== "done"); if (stop >= 0 && r.state === "FAILED") marks[stop] = "stopped"; }
+  if (stop < 0) { stop = marks.findIndex(m => m !== "done" && m !== "skipped"); if (stop >= 0 && r.state === "FAILED") marks[stop] = "stopped"; }
   return marks.map((m, i) => stop >= 0 && i > stop && !m ? "unreached" : m);
 }
 function plural(n, word) { return num(n) + " " + word + (n === 1 ? "" : "s"); }

@@ -562,3 +562,16 @@ def test_eval_page_reads_the_last_report_or_says_how_to_make_one(env, tmp_path):
     d = env.client.get("/api/eval", headers=H).json()
     assert d["verdict"] == "FAIL" and d["probe_rows"][0]["key"] == "deleted-test" and "measured_at" in d
     assert env.client.get("/api/eval", headers={"host": H["host"]}).status_code == 401                      # same token rule as every page
+
+
+def test_explored_reads_skipped_when_the_orchestrator_went_straight_to_the_coder(tmp_path):
+    from codepilot.dashboard.data import _stage_marks
+    conn = connect(tmp_path / "cp.db")
+    run_dir = tmp_path / "runs" / "r1"
+    run_dir.mkdir(parents=True)
+    run_dir.joinpath("events.jsonl").write_text(
+        "\n".join(json.dumps({"kind": "state", "text": s}) for s in ("IMPLEMENTING", "TESTING")) + "\n")
+    run = {"id": "r1", "task_type": "bug_fix", "reason": "", "pr_url": None, "state": "AWAITING_APPROVAL"}
+    assert _stage_marks(conn, tmp_path / "runs", run)["Explored"] == "skipped"
+    run_dir.joinpath("events.jsonl").write_text(json.dumps({"kind": "state", "text": "TRIAGED"}) + "\n")
+    assert _stage_marks(conn, tmp_path / "runs", run)["Explored"] == ""      # never got that far: not "skipped"

@@ -93,6 +93,7 @@ td.done { background: color-mix(in srgb, var(--ok) 13%, var(--card)); color: var
 td.failed, td.stopped { background: color-mix(in srgb, var(--bad) 15%, var(--card)); box-shadow: inset 3px 0 0 var(--bad); }
 td.voided { background: color-mix(in srgb, var(--amber) 16%, var(--card)); box-shadow: inset 3px 0 0 var(--amber); }
 td.unreached { color: var(--muted); text-align: center; }
+td.skipped { color: var(--muted); font-size: 12px; }
 td.attention { background: color-mix(in srgb, var(--amber) 14%, var(--card)); font-weight: 600; min-width: 160px; }
 span.warn { color: var(--amber); font-size: 16px; }
 

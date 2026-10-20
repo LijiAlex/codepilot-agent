@@ -132,12 +132,13 @@ def overview_skills(conn: sqlite3.Connection, repos: list[str]) -> dict:
 
 
 def _stage_marks(conn, runs_dir: Path, run: sqlite3.Row) -> dict[str, str]:
-    """done / failed / '' per stage, from state events, handoffs and the final state."""
+    """done / failed / skipped / '' per stage, from state events, handoffs and the final state."""
     events = _events(runs_dir, run["id"])
     seen = {e["text"] for e in events if e["kind"] == "state"}
     marks = {s: "" for s in STAGES}
     marks["Triaged"] = "done" if run["task_type"] else ""
     if "EXPLORING" in seen: marks["Explored"] = "done"
+    elif "IMPLEMENTING" in seen: marks["Explored"] = "skipped"   # the issue and repo map already showed where to change
     if "IMPLEMENTING" in seen: marks["Implemented"] = "done"
     if "TESTING" in seen: marks["Tested"] = "done"
     pub = conn.execute("select status from handoffs where run_id=? and entry_point in ('publish','publish_failed') "
