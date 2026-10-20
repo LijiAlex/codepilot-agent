@@ -103,16 +103,14 @@ function resultWord(r) { return RESULTS[r || ""] || (/^\d+$/.test(r) ? "exit cod
 function cardLink(label, value, page) { const c = el(page ? "a" : "div", null, "card"); if (page) c.href = "#" + page; c.appendChild(el("b", value)); c.appendChild(el("span", label, "muted")); return c; }
 function filterInput(placeholder, onChange) { const i = el("input", null, "filter"); i.type = "search"; i.placeholder = placeholder; i.addEventListener("input", () => onChange(i.value.trim().toLowerCase())); return i; }
 const RUBRIC = [["correctness", "C"], ["tests", "T"], ["matches the issue", "M"], ["risk", "R"], ["scope", "S"]];
-function scoreText(f) {                // "6/10 (capped: tests not run · rubric 10)" — a cap is never hidden behind a hover
-  if (!f.cap) return f.score + "/10";
-  const sum = Object.values(f.rubric || {}).reduce((a, b) => a + b, 0);
-  const why = String(f.cap).replace(/^capped at \d+:\s*/, "");
-  return f.score + "/10 (capped: " + why + (Object.keys(f.rubric || {}).length ? " · rubric " + sum : "") + ")";
-}
 function rubricCell(f, why = {}) {      // one Score column: "9/10" (or why it was capped), "C2 T1 M2 R2 S2" under it, reasons on hover
   const r = f.rubric || {}, c = el("td", null, "score");
   if (f.score === null || f.score === undefined) return el("td", "");
-  c.appendChild(el("div", scoreText(f)));
+  c.appendChild(el("div", f.score + "/10"));
+  if (f.cap) {                                            // the cap on its own line, so the column stays narrow
+    const sum = Object.values(r).reduce((a, b) => a + b, 0);
+    c.appendChild(el("div", "capped: " + String(f.cap).replace(/^capped at \d+:\s*/, "") + (Object.keys(r).length ? " (rubric " + sum + ")" : ""), "small warn-text"));
+  }
   if (Object.keys(r).length) {
     c.appendChild(el("div", RUBRIC.filter(([k]) => k in r).map(([k, a]) => a + r[k]).join(" "), "rubric small muted"));
     c.title = RUBRIC.filter(([k]) => k in r).map(([k]) => k + " " + r[k] + "/2" + (why[k] ? ": " + why[k] : "")).join("\n");
@@ -307,9 +305,10 @@ const render = {
         close.title = "Close without merging (asks first)"; actions.appendChild(close);
         if (why) actions.appendChild(el("div", "Merge: " + why, "muted small"));
         const ready = f.merge_ready === true ? "yes" : f.merge_ready === false ? "no" + (f.why_not ? " — " + f.why_not : "") : "";
-        const rev = el("td");
+        const rev = el("td", null, "review");
         if (p.review) { rev.appendChild(details(p.review.current ? "full review" : "full review (older commit)", p.review.body)); } else rev.appendChild(el("span", "not reviewed yet", "muted"));
-        return [att, td(link("#" + p.number + " " + p.title, p.url)), p.run_id ? td(runLink(p.run_id)) : el("td", "not from CodePilot+", "muted"),
+        const title = td(link("#" + p.number + " " + p.title, p.url)); title.className = "title";
+        return [att, title, p.run_id ? td(runLink(p.run_id)) : el("td", "not from CodePilot+", "muted"),
           rubricCell(f, f.rubric_reasons || {}),
           f.effort === null || f.effort === undefined ? "" : f.effort + "/5", ready, f.matches || "",
           (f.security || []).length ? el("td", f.security.join("; "), "failed") : "none",
