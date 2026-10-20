@@ -30,7 +30,7 @@ def test_finds_words_secrets_env_tiers_and_emails(tmp_path):
                              ".env": "K=1", "notes.txt": "token ghp_" + "a" * 30}, email="me@zebracorp.example")
     probs = "\n".join(cr.check(r, ["zebracorp", "# comment lines are ignored"]))
     assert "forbidden word 'zebracorp' in src/a.py" in probs and "tracked: .env" in probs
-    assert "possible secret" in probs and "README section missing: ## Try it" in probs
+    assert "possible secret" in probs and "README section missing: ## Quick start" in probs
     assert "build tier ('stretch goal')" in probs and "me@zebracorp.example" in probs
 
 
