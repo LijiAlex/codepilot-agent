@@ -75,6 +75,18 @@ def _changes_files(data: dict) -> bool:
         return any(argv and argv[0].rsplit("/", 1)[-1] not in _READ_ONLY and not _runs_tests(argv) for argv in segs)
     return False
 
+
+_PROVIDER_STATUS = {401: "authentication failed", 403: "permission denied", 429: "rate limited", 529: "overloaded"}
+
+
+def provider_problem(e: Exception) -> str | None:
+    """A failure of the model provider account (credit, key, rate, capacity): says nothing about the issue, so it must not
+    stop the issue being retried."""
+    if "credit balance is too low" in str(e):
+        return "provider: credit balance too low"
+    status = getattr(e, "status_code", None)
+    return f"provider: {_PROVIDER_STATUS[status]} ({status})" if status in _PROVIDER_STATUS else None
+
 class TimeLimitExceeded(RuntimeError):
     pass
 
@@ -416,7 +428,7 @@ class Worker:
             s.audit.log("worker", "run_error", run_id=run_id, result="error", detail={"type": type(e).__name__, "msg": redact(str(e))[:500]})
             if lost:
                 return self._finish(rec, run_id, item, RunState.FAILED, "sandbox_lost", reclaim_local=True)
-            return self._finish(rec, run_id, item, RunState.FAILED, f"error: {type(e).__name__}")
+            return self._finish(rec, run_id, item, RunState.FAILED, provider_problem(e) or f"error: {type(e).__name__}")
         finally:
             st = s.settings
             s.runs.update(run_id, tokens_in=translator.tokens_in, tokens_out=translator.tokens_out,

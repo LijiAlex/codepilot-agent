@@ -13,7 +13,7 @@ from pathlib import Path
 from langgraph.store.sqlite import SqliteStore
 
 NOT_A_FAILURE = {"crashed", "sandbox_lost"}     # E11: a crash or a lost box says nothing about the issue
-INFRA_PREFIXES = ("setup:",)                    # the sandbox could not be prepared (image, install): not the issue's fault
+INFRA_PREFIXES = ("setup:", "provider:")       # the sandbox could not be prepared, or the model provider refused the account: not the issue's fault
 
 
 class EpisodicMemory:
