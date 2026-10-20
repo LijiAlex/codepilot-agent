@@ -4,6 +4,8 @@
 
 Engineering teams lose hours every sprint to small, well-defined issues: a bug flagged by a test, a dependency bump, a missing paragraph in the docs. You label an issue `ai-assignable`; a team of AI agents finds the relevant code, makes the change in an isolated copy of the repository, runs the tests and prepares a pull request. Nothing reaches GitHub until you approve it.
 
+**Contents:** [Demo](#demo) · [How it works](#how-it-works) · [What's included](#whats-included) · [Quick start](#quick-start) · [Using it](#using-it) · [Connect your own repository](#connect-your-own-repository) · [Architecture](#architecture) · [Example pull requests](#example-pull-requests) · [Safety](#safety) · [Results](#results) · [Design choices](#design-choices) · [For reviewers](#for-reviewers-the-assignment-brief) · [Known limitations](#known-limitations)
+
 ## CodePilot+ in 30 seconds
 
 <!-- On github.com: edit this file and drag docs/codepilot-pitch.mp4 onto this line; GitHub turns it into an inline player. -->
@@ -25,6 +27,8 @@ Engineering teams lose hours every sprint to small, well-defined issues: a bug f
 
 ## How it works
 
+### The flow
+
 ```mermaid
 flowchart LR
   I[GitHub issue<br/>labelled ai-assignable] --> S[Safety screen]
@@ -35,6 +39,8 @@ flowchart LR
   PR --> R[Independent AI review]
   PR -- merged --> M[Lesson saved to memory]
 ```
+
+### Step by step
 
 1. **Watch.** Every 5 minutes CodePilot+ checks your repositories for open issues labelled `ai-assignable` (or you type a task in the terminal).
 2. **Screen.** The issue text is cleaned and checked for prompt injection (instructions hidden in an issue to trick the AI) before any agent reads it.
@@ -54,7 +60,9 @@ flowchart LR
 
 ## Quick start
 
-**Without any keys** (Python 3.12 and [uv](https://docs.astral.sh/uv/) only):
+### Check it without any keys
+
+Running CodePilot+ live needs paid API keys and a GitHub App. Without them you can still run the tests, check the agents' tool sets, and replay the real run of issue #25 from the demo. You need only Python 3.12 and [uv](https://docs.astral.sh/uv/).
 
 ```bash
 git clone https://github.com/LijiAlex/codepilot-agent && cd codepilot-agent
@@ -63,7 +71,9 @@ uv run codepilot selfcheck                                  # every agent has ex
 uv run codepilot replay examples/run-issue-25/events.jsonl  # the recorded run of issue #25 from the demo, step by step
 ```
 
-**To run it live, you need:** Python 3.12, [uv](https://docs.astral.sh/uv/), an Anthropic API key, a [LangSmith](https://smith.langchain.com/) API key for tracing, an OpenAI API key for the independent reviewer, a [Daytona](https://www.daytona.io/) API key (or `sandbox: local` in `codepilot.yml` for a weaker macOS-only sandbox), and a GitHub App (see [Connect your own repository](#connect-your-own-repository)).
+### Run it live
+
+You need: Python 3.12, [uv](https://docs.astral.sh/uv/), an Anthropic API key, a [LangSmith](https://smith.langchain.com/) API key for tracing, an OpenAI API key for the independent reviewer, a [Daytona](https://www.daytona.io/) API key (or `sandbox: local` in `codepilot.yml` for a weaker macOS-only sandbox), and a GitHub App (see [Connect your own repository](#connect-your-own-repository)).
 
 ```bash
 cp .env.example .env                    # fill in your keys
@@ -74,6 +84,8 @@ cp codepilot.example.yml codepilot.yml  # then delete the two example entries un
 
 ## Using it
 
+### Start the terminal UI and the dashboard
+
 Open two terminals:
 
 | | Start it | Use it for |
@@ -83,20 +95,28 @@ Open two terminals:
 
 (Or run both in one process: `scripts/with-env codepilot --dashboard 8765`.)
 
-**In the terminal UI:** wait for the next poll (shown in the issues panel title) or press `i` to type a task. To decide on an item, press `Tab` until the Human Approval panel is highlighted, pick it with the arrow keys, press `v` to inspect the diff, tests and PR text, then `a` to approve or `r` to reject. Other keys: `s` skip an issue, `l` full log, `q` quit.
+### In the terminal UI
 
-**On the dashboard:** a pull request can be merged once the independent reviewer has scored it merge-ready. Proposed skill changes wait on the Improvements tab.
+Wait for the next poll (shown in the issues panel title) or press `i` to type a task. To decide on an item, press `Tab` until the Human Approval panel is highlighted, pick it with the arrow keys, press `v` to inspect the diff, tests and PR text, then `a` to approve or `r` to reject. Other keys: `s` skip an issue, `l` full log, `q` quit.
+
+### On the dashboard
+
+A pull request can be merged once the independent reviewer has scored it merge-ready. Proposed skill changes wait on the Improvements tab.
 
 ![Dashboard overview](docs/dashboard.png)
 
 ## Connect your own repository
+
+### Set up CodePilot+ on the repository
 
 1. **Create a GitHub App** (GitHub → Settings → Developer settings → GitHub Apps) with repository permissions *Contents*, *Pull requests* and *Issues*: read & write; *Metadata*: read. Generate a private key (`.pem`) and install the App on your repository. In `.env`, set `CODEPILOT_GH_APP_ID` and `CODEPILOT_GH_APP_KEY_PATH` (the path to the `.pem` file).
 2. **Connect it:** `scripts/with-env codepilot connect OWNER/REPO --write`. This checks access, creates the `ai-assignable` and review labels, detects the install and test commands, builds the repo map and the repository's first skill notes, and adds the repository to `codepilot.yml`. Add `--no-index` to skip the embedding model download.
 3. **Limit who can assign work:** in that entry in `codepilot.yml`, add `author_allowlist: [your-github-login]`. Without it, anyone's issue is accepted.
 4. **Label an issue** `ai-assignable` and start the terminal UI.
 
-**Add the independent reviewer.** It needs a second GitHub App for the reviewer, the OpenAI key, and `gh` with the workflow scope (`gh auth refresh -s workflow`).
+### Add the independent reviewer
+
+It needs a second GitHub App for the reviewer, the OpenAI key, and `gh` with the workflow scope (`gh auth refresh -s workflow`).
 
 ```bash
 uv run python scripts/install_reviewer.py --repo OWNER/REPO --install "pip install -e . pytest"           # preview
@@ -107,9 +127,13 @@ Then, in the repository's settings, add the secrets `OPENAI_API_KEY` and `REVIEW
 
 ## Architecture
 
+### Diagram
+
 ![CodePilot+ architecture](docs/architecture.png)
 
 Blue boxes are AI agents or models, green boxes are plain code, orange boxes are where a person decides. Pink PLUS tags mark what goes beyond the brief.
+
+### Tech stack
 
 | Part | Built with |
 |---|---|
@@ -123,16 +147,25 @@ Blue boxes are AI agents or models, green boxes are plain code, orange boxes are
 | Independent reviewer | GitHub Action with an OpenAI model |
 | Tracing | LangSmith |
 
+### LangSmith trace
+
 ![One run traced in LangSmith](docs/langsmith.png)
 
 *One run in LangSmith: the Orchestrator reads issue #25 and delegates to the Coder, with time, tokens and cost per step.*
 
 ## Example pull requests
 
-- **Issue #25 → [PR #28](https://github.com/LijiAlex/codepilot-playground/pull/28)** (the run in the demo): a one-line fix plus regression tests, scored 10/10 and merge-ready. Branch `codepilot/issue-25-fix-empty-block-reason-leak-check`, commit `fix(#25): …`, labels `codepilot-generated`, `needs-review`.
-- **A real, shipped project:** on [`layered-memory`](https://github.com/LijiAlex/layered-memory), a Claude Code plugin with its own tests, four genuine problems were fixed and merged: [#1](https://github.com/LijiAlex/layered-memory/pull/1), [#5](https://github.com/LijiAlex/layered-memory/pull/5), [#8](https://github.com/LijiAlex/layered-memory/pull/8), [#9](https://github.com/LijiAlex/layered-memory/pull/9).
+### From the demo: issue #25 → PR #28
+
+[PR #28](https://github.com/LijiAlex/codepilot-playground/pull/28): a one-line fix plus regression tests, scored 10/10 and merge-ready. Branch `codepilot/issue-25-fix-empty-block-reason-leak-check`, commit `fix(#25): …`, labels `codepilot-generated`, `needs-review`.
+
+### On a real, shipped project
+
+On [`layered-memory`](https://github.com/LijiAlex/layered-memory), a Claude Code plugin with its own tests, four genuine problems were fixed and merged: [#1](https://github.com/LijiAlex/layered-memory/pull/1), [#5](https://github.com/LijiAlex/layered-memory/pull/5), [#8](https://github.com/LijiAlex/layered-memory/pull/8), [#9](https://github.com/LijiAlex/layered-memory/pull/9).
 
 ## Safety
+
+### Guards
 
 | What is guarded | How | AI, rule or person |
 |---|---|---|
@@ -142,7 +175,9 @@ Blue boxes are AI agents or models, green boxes are plain code, orange boxes are
 | Risky steps | A PR to main, more than 5 files, a third test attempt, an unknown command, a plan: you approve | **person** |
 | Pull request quality | Independent reviewer; code caps the score (4 for security concerns, 6 if untested) | **AI** + fixed rule |
 
-**Security edge cases to try**
+### Security edge cases you can test
+
+The submission guide asks for a system that can be tested with security edge cases. These are the ones CodePilot+ handles, and what you will see:
 
 | Try this | What happens |
 |---|---|
@@ -155,6 +190,8 @@ Blue boxes are AI agents or models, green boxes are plain code, orange boxes are
 Ready-made cases are in [`playground/issues.yaml`](playground/issues.yaml) and [`evals/issues.yaml`](evals/issues.yaml).
 
 ## Results
+
+### Evaluation verdict
 
 Final evaluation, 20 October 2026: 30 runs on 15 issues. **Verdict: PASS** — every signal cleared a line set before the results existed. Full report: [`results/eval.md`](results/eval.md).
 
@@ -181,7 +218,9 @@ Two grading changes made after a first run are disclosed in the report (original
 
 ## For reviewers: the assignment brief
 
-Every requirement in the brief is addressed. Where CodePilot+ deliberately differs:
+Every requirement in the brief is addressed.
+
+### Where CodePilot+ differs from the brief, and why
 
 | The brief asks for | CodePilot+ does | Why |
 |---|---|---|
@@ -194,7 +233,9 @@ Every requirement in the brief is addressed. Where CodePilot+ deliberately diffe
 | Subagents spawn subagents | The Coder is a full agent that runs the Test Agent | DeepAgents' simple subagents can't spawn others |
 | Skip issues above the complexity threshold | Labelled ones get a plan for you to approve | A person asked for the work |
 
-**Bonus items done:** complexity scoring, self-healing tests (a Test Doctor fixes a broken test setup once), LangSmith tracing, Daytona cloud sandbox. Not done: ACP integration.
+### Bonus items
+
+Done: complexity scoring, self-healing tests (a Test Doctor fixes a broken test setup once), LangSmith tracing, Daytona cloud sandbox. Not done: ACP integration.
 
 ## Known limitations
 
