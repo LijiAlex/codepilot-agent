@@ -102,6 +102,8 @@ const RESULTS = { "": "ok", ok: "ok", refused: "refused", error: "error", paused
 function resultWord(r) { return RESULTS[r || ""] || (/^\d+$/.test(r) ? "exit code " + r : String(r)); }
 function cardLink(label, value, page) { const c = el(page ? "a" : "div", null, "card"); if (page) c.href = "#" + page; c.appendChild(el("b", value)); c.appendChild(el("span", label, "muted")); return c; }
 function filterInput(placeholder, onChange) { const i = el("input", null, "filter"); i.type = "search"; i.placeholder = placeholder; i.addEventListener("input", () => onChange(i.value.trim().toLowerCase())); return i; }
+const EFFORT_HELP = "1 = one file, up to 20 lines\n2 = two files or over 20 lines\n3 = three or more files, or over 80 lines\n"
+  + "4 = over 250 lines\n5 = over 600 lines, or anything under .github/\nPackaging or lock files (pyproject.toml, requirements, *.lock) make it at least 3";
 const RUBRIC = [["correctness", "C"], ["tests", "T"], ["matches the issue", "M"], ["risk", "R"], ["scope", "S"]];
 function rubricCell(f, why = {}) {      // one Score column: "9/10" (or why it was capped), "C2 T1 M2 R2 S2" under it, reasons on hover
   const r = f.rubric || {}, c = el("td", null, "score");
@@ -282,7 +284,7 @@ const render = {
     const d = await api("prs");
     m.appendChild(el("p", "Rubric: C correctness · T tests · M matches the issue · R risk · S scope, 0–2 each. They add up to the score "
       + "unless a cap applies (security concerns cap it at 4; tests not run or failing cap it at 6). Effort is how much work the "
-      + "change is to review (1–5), from its size.", "muted small"));
+      + "change is for a person to review, computed from the diff (not by the AI): " + EFFORT_HELP.replace(/\n/g, "; ") + ".", "muted small"));
     for (const [repo, prsIn] of Object.entries(d)) {
       m.appendChild(el("h2", repo));
       if (prsIn.error) { m.appendChild(el("p", "Could not load: " + prsIn.error, "muted")); continue; }
@@ -310,7 +312,7 @@ const render = {
         const title = td(link("#" + p.number + " " + p.title, p.url)); title.className = "title";
         return [att, title, p.run_id ? td(runLink(p.run_id)) : el("td", "not from CodePilot+", "muted"),
           rubricCell(f, f.rubric_reasons || {}),
-          f.effort === null || f.effort === undefined ? "" : f.effort + "/5", ready, f.matches || "",
+          f.effort === null || f.effort === undefined ? "" : tdTitle(f.effort + "/5", "Review effort, from the diff:\n" + EFFORT_HELP), ready, f.matches || "",
           (f.security || []).length ? el("td", f.security.join("; "), "failed") : "none",
           u.count ? num(u.count) : "—", u.count ? "$" + Number(u.cost || 0).toFixed(3) : "—", actions, rev, p.labels.join(", "),
           p.author + (p.from_fork ? " (fork)" : "")];
