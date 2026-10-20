@@ -29,6 +29,12 @@ flowchart LR
 6. **Publish.** After approval, CodePilot+ re-checks the issue and the main branch, then commits exactly the approved change and opens one pull request, labelled and linked to the issue.
 7. **Learn.** A separate AI reviewer scores every pull request. When a pull request is merged, CodePilot+ saves a short lesson it can recall the next time it meets a similar issue.
 
+## Architecture
+
+![CodePilot+ architecture](docs/architecture.png)
+
+Blue boxes are AI agents or models, green boxes are plain code, and orange boxes are where a person decides. Pink PLUS tags mark what goes beyond the assignment brief.
+
 ## What's inside
 
 **The agent team.** Built with [DeepAgents](https://github.com/langchain-ai/deepagents) on LangGraph. An Orchestrator plans each task as a checklist and hands work to a Repo Explorer, a Coder, a Test Agent and a PR Agent. Each agent gets only the tools it needs; the list is checked every time the app starts.
