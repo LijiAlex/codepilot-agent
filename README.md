@@ -50,7 +50,7 @@ Blue boxes are AI agents or models, green boxes are plain code, and orange boxes
 **Memory.** Three kinds, as people have:
 - *Working memory* — the current task's state, shared between the agents and cleared when the task ends.
 - *Session memory* — a summary of each session, read at start-up so recently failed issues are not retried straight away.
-- *Lessons* — what worked (from merged pull requests) and what went wrong (from failures and rejections), stored per repository and task type and recalled for similar issues.
+- *Lessons* — what worked (from merged pull requests) and what went wrong (from failures and rejections), stored per repository and task type. The three most similar are recalled for a new issue and given to the Orchestrator for planning and to the agents that do the work, marked as untrusted text because they quote issue titles.
 
 **It improves itself — with your sign-off.** After each run, CodePilot+ looks at what slowed the agents down (a refused command, a file they could not find) and proposes a change to that repository's own skill notes — add, correct or retire one step, never a rewrite. Proposals that keep coming back gain confidence; none take effect until you approve them on the dashboard.
 

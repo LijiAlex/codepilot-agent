@@ -24,6 +24,7 @@ from codepilot.agents.tools import (AttemptState, make_fetch_changelog_tool, mak
 from codepilot.changes import capture_changes, unified_diff
 from codepilot.memory.working import WorkingMemory
 from codepilot.safety.allowlist import make_secret_path_guard, make_tool_allowlist
+from codepilot.safety.sanitize import sanitize_untrusted
 from codepilot.safety.shell_guard import make_shell_guard
 from codepilot.sandbox.base import SANDBOX_ROUTE, SECRET_GLOBS, sandbox_permissions
 from codepilot.skills import Skill, render_skill_prompt
@@ -160,12 +161,19 @@ def _unavailable_semantic() -> StructuredTool:
     return StructuredTool.from_function(semantic_search, name="semantic_search")
 
 
+def lessons_block(items: list[str]) -> str:
+    """Recalled lessons quote issue titles and agent text, so they enter prompts as untrusted, sanitised data."""
+    if not items:
+        return "(none yet)"
+    return "<untrusted_lessons>\n" + "\n".join(f"- {sanitize_untrusted(l, 1000)}" for l in items) + "\n</untrusted_lessons>"
+
+
 def build_graph(ctx: RunContext, models: dict[str, Any], checkpointer=None):
     """models: one chat model per agent name (they may be the same object in production)."""
     base_perms = sandbox_permissions(ctx.protected_paths)
-    lessons = "\n".join(f"- {l}" for l in ctx.lessons[:3]) or "(none yet)"
+    lessons = lessons_block(ctx.lessons[:3])
     tl = [l for l in ctx.lessons if "test" in l.lower()][:3]                         # Plus: testing lessons for the Test Agent
-    testing_lessons = ("Testing lessons from earlier work in this repository:\n" + "\n".join(f"- {l}" for l in tl)) if tl else ""
+    testing_lessons = ("Testing lessons from earlier work in this repository:\n" + lessons_block(tl)) if tl else ""
     task_json = WorkingMemory.VIRTUAL_PATH
     full_note = " — this task type always runs the whole suite" if ctx.skill.full_test_suite else ""
     show_diff = make_show_diff_tool(ctx)
@@ -233,7 +241,8 @@ def build_graph(ctx: RunContext, models: dict[str, Any], checkpointer=None):
         model=models["orchestrator"],
         system_prompt=prompts.ORCHESTRATOR.format(repo=ctx.repo, untrusted=prompts.UNTRUSTED, task_type=ctx.task_type,
                                                   complexity=ctx.complexity, skill=render_skill_prompt(ctx.skill),
-                                                  repo_skill=ctx.repo_skill, plan=ctx.plan_text, task_json=task_json),
+                                                  repo_skill=ctx.repo_skill, plan=ctx.plan_text, task_json=task_json,
+                                                  lessons=lessons),
         tools=orch_tools,
         subagents=[explorer, CompiledSubAgent(name="coder", description="Changes the code and gets it tested (runs the test agent).",
                                               runnable=coder), pr_agent],

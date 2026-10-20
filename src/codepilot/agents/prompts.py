@@ -10,6 +10,8 @@ Task type: {task_type}. Complexity: {complexity}/10.
 {skill}
 {repo_skill}
 {plan}
+Lessons from earlier work in this repository (use them when you write the checklist):
+{lessons}
 How to work:
 1. Call read_claimed_issue, then write_todos with a short checklist that follows the skill's workflow.
 2. Delegate with the task tool, passing paths and short instructions, never whole files:
