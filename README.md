@@ -8,8 +8,8 @@ Engineering teams lose hours every sprint to small, well-defined issues: a bug f
 
 ## CodePilot+ in 30 seconds
 
-<!-- On github.com: edit this file and drag docs/codepilot-pitch.mp4 onto this line; GitHub turns it into an inline player. -->
-▶ [Watch the 30-second pitch](docs/codepilot-pitch.mp4)
+https://github.com/user-attachments/assets/014654ff-ab4b-4968-90a4-cfe01fa8bc64
+
 
 ## Demo
 
