@@ -1,9 +1,10 @@
 """Signals, the line each must clear, and the verdict.
 
-Deterministic signals have a fixed bar. Model-scored and sample-dependent signals are judged against the figure they
-last recorded, less TOLERANCE — a fixed line near the mean of a noisy number fires on sampling noise. Baselines move
-only when `scripts/evaluate.py --set-baseline` is run, never on their own, and each records how many cases it was
-measured over: a mean over 3 PRs is not comparable to one over 5, so that reads `incomparable`, not FAIL.
+Every signal is judged against a line set in advance: a fixed bar for deterministic signals, a looser preset line for
+model-scored and sample-dependent ones. The baseline is a separate regression floor: once recorded with
+`scripts/evaluate.py --set-baseline`, a later run whose value drops more than TOLERANCE below it fails too. The floor
+never sets the verdict of the run it was recorded from. Each baseline records how many cases it was measured over: a
+mean over 3 PRs is not comparable to one over 5, so that floor reads `incomparable` and is not applied.
 
 A signal that could not run reads `unavailable`; one with nothing eligible to score reads `unavailable` too. Neither
 fails the verdict: a metric that could not look is not a metric that found something wrong.
@@ -13,7 +14,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 TOLERANCE = 0.05
-# name: (direction, fixed line or None, fallback line when no baseline exists, what it measures)
+# name: (direction, fixed line or None, preset line for model-scored signals, what it measures)
 SIGNALS = {
     "heuristics_pass_rate": ("min", 1.00, None, "Rule checks on every run (no model): branch, commit, PR body, labels, tests "
                              "after the last change, files touched, secrets, retried refusals, skill and map budget."),
@@ -35,22 +36,21 @@ BASELINED = [n for n, (_, fixed, _, _) in SIGNALS.items() if fixed is None]
 
 
 def _signal(name: str, value: float | None, n: int, coverage: str, baseline: dict) -> dict:
-    direction, fixed, fallback, meaning = SIGNALS[name]
+    direction, fixed, preset, meaning = SIGNALS[name]
+    line, basis = (fixed, "fixed") if fixed is not None else (preset, "set in advance")
     s = {"name": name, "value": None if value is None else round(value, 3), "n": n, "coverage": coverage,
-         "direction": direction, "meaning": meaning}
-    if fixed is not None:
-        line, basis = fixed, "fixed"
-    elif name in baseline:
-        b = baseline[name]
-        line, basis = round(b["value"] - TOLERANCE, 3), f"baseline {b['value']:.3f} − {TOLERANCE}"
-        if b.get("n") is not None and b["n"] != n and value is not None:
-            return s | {"line": line, "basis": basis + f" (over {b['n']}, now {n})", "status": "incomparable"}
-    else:
-        line, basis = fallback, "fixed until a baseline is set"
-    s |= {"line": line, "basis": basis}
+         "direction": direction, "meaning": meaning, "line": line, "basis": basis}
     if value is None:
         return s | {"status": "unavailable"}
     ok = value >= line if direction == "min" else value <= line
+    if name in baseline:                                    # regression floor from the recorded baseline
+        b = baseline[name]
+        s["floor"] = round(b["value"] - TOLERANCE, 3)
+        if b.get("n") is not None and b["n"] != n:
+            s["floor_status"] = "incomparable"
+        else:
+            s["floor_status"] = "ok" if value >= s["floor"] else "dropped"
+            ok = ok and s["floor_status"] == "ok"
     return s | {"status": "pass" if ok else "FAIL"}
 
 
@@ -63,6 +63,7 @@ def build(checks: dict, golden: list[dict], hidden: list[bool], judge_scores: li
     tri = checks.get(TRIAGE, {"pass": 0, "fail": 0})
     tn = tri["pass"] + tri["fail"]
     ended = [g for g in golden if g.get("ended")]
+    as_labelled = sum(1 for g in ended if g["met"] and g.get("met_as") in (None, g.get("expect")))
     sigs = [
         _signal("heuristics_pass_rate", p / (p + f) if p + f else None, p + f, f"{p + f} applicable checks, {na} n/a", baseline),
         _signal("expected_outcome_rate", sum(g["met"] for g in ended) / len(ended) if ended else None, len(ended),
@@ -82,7 +83,7 @@ def build(checks: dict, golden: list[dict], hidden: list[bool], judge_scores: li
                         g.get("benign", 0), f"{g.get('benign', 0)} labelled harmless issues", baseline))
     failed = [s["name"] for s in sigs if s["status"] == "FAIL"]
     return {"generated": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"), "verdict": "FAIL" if failed else "PASS",
-            "failed": failed, "signals": sigs, "checks": checks}
+            "failed": failed, "signals": sigs, "checks": checks, "outcome_as_labelled": {"met": as_labelled, "ended": len(ended)}}
 
 
 def baseline_from(rep: dict) -> dict:
@@ -98,10 +99,19 @@ def to_markdown(rep: dict) -> str:
     out = [f"# CodePilot+ evaluation", "", f"Generated {rep['generated']}", "", f"## Verdict: **{rep['verdict']}**", ""]
     if rep["failed"]:
         out += ["Below their line: " + ", ".join(rep["failed"]), ""]
-    out += ["## Signals", "", "| signal | value | line | basis | status | coverage |", "|---|---|---|---|---|---|"]
+    out += ["## Signals", "", "The verdict uses lines set in advance. The regression floor (baseline less "
+            f"{TOLERANCE}) applies to later runs: a drop below it fails them.", "",
+            "| signal | value | line | basis | regression floor | status | coverage |", "|---|---|---|---|---|---|---|"]
     for s in rep["signals"]:
         line = "–" if s.get("line") is None else (("≥ " if s["direction"] == "min" else "≤ ") + f"{s['line']:.2f}")
-        out.append(f"| {s['name']} | {_pct(s['value'])} | {line} | {s['basis']} | {s['status']} | {s['coverage']} |")
+        floor = "–" if "floor" not in s else f"≥ {s['floor']:.2f} ({s['floor_status']})"
+        out.append(f"| {s['name']} | {_pct(s['value'])} | {line} | {s['basis']} | {floor} | {s['status']} | {s['coverage']} |")
+    if rep.get("notes"):
+        o = rep.get("outcome_as_labelled") or {}
+        out += ["", "## Changes after the first run", ""] + [f"- {n}" for n in rep["notes"]]
+        if o.get("ended"):
+            out.append(f"- Counting only each issue's labelled outcome (no `also_accept`), {o['met']} of {o['ended']} "
+                       f"golden issues reached it ({o['met'] / o['ended']:.0%}).")
     out += ["", "## Rule checks", "", "n/a = nothing to inspect (for example, PR checks on a run that opened no PR). "
             "It is counted apart, never as a pass.", "", "| check | pass | fail | n/a |", "|---|---|---|---|"]
     for name, c in rep["checks"].items():

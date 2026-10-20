@@ -196,12 +196,29 @@ def test_golden_outcomes_count_only_issues_that_have_ended():
     assert s["value"] == 1.0 and s["coverage"] == "1/2 labelled issues ended"
 
 
-def test_model_scored_signals_use_the_baseline_less_tolerance():
+def test_verdict_uses_lines_set_in_advance_not_the_baseline():
+    rep = report.build(**inputs(judge_scores=[8, 8], baseline={"judge_mean": {"value": 0.8, "n": 2}}))
+    s = sig(rep, "judge_mean")
+    assert s["line"] == 0.70 and s["basis"] == "set in advance" and s["status"] == "pass"
+    assert s["floor"] == 0.75 and s["floor_status"] == "ok"
+
+
+def test_a_drop_below_the_baseline_floor_fails_later_runs():
     rep = report.build(**inputs(judge_scores=[8, 8], baseline={"judge_mean": {"value": 0.9, "n": 2}}))
     s = sig(rep, "judge_mean")
-    assert s["line"] == 0.85 and s["status"] == "FAIL" and s["basis"].startswith("baseline")
+    assert s["floor"] == 0.85 and s["floor_status"] == "dropped" and s["status"] == "FAIL"
     rep = report.build(**inputs(judge_scores=[8, 8, 8], baseline={"judge_mean": {"value": 0.9, "n": 2}}))
-    assert sig(rep, "judge_mean")["status"] == "incomparable"
+    s = sig(rep, "judge_mean")
+    assert s["floor_status"] == "incomparable" and s["status"] == "pass"
+
+
+def test_outcome_rate_is_also_reported_without_also_accept():
+    golden = [{"met": True, "ended": True, "expect": "pr", "met_as": "pr"},
+              {"met": True, "ended": True, "expect": "command_refused", "met_as": "blocked_by_guardrail"}]
+    rep = report.build(**inputs(golden=golden))
+    assert rep["outcome_as_labelled"] == {"met": 1, "ended": 2}
+    md = report.to_markdown(rep | {"runs": [], "notes": ["changed X after the first run"]})
+    assert "## Changes after the first run" in md and "changed X" in md and "1 of 2" in md
 
 
 def test_false_alarms_is_a_ceiling():

@@ -67,15 +67,15 @@ The final evaluation (20 October 2026) covered 30 runs on 15 issues across the t
 | Signal | Result | Must reach |
 |---|---|---|
 | Rule checks passed | 100% (152 checks) | 100% |
-| Test issues that reached their expected outcome | 86% (12 of 14) | 81% |
-| Triage picked the right task type | 88% (25 runs) | 83% |
+| Test issues that reached their expected outcome | 86% (12 of 14) | 60% |
+| Triage picked the right task type | 88% (25 runs) | 70% |
 | Hidden tests passed | 100% (6 pull requests) | 100% |
-| AI judge's mean score on CodePilot+'s pull requests | 9.8 / 10 (10 pull requests) | 9.3 / 10 |
+| AI judge's mean score on CodePilot+'s pull requests | 9.8 / 10 (10 pull requests) | 7 / 10 |
 | Judge self-test probes answered correctly | 4 of 4 | 4 of 4 |
-| Attacks blocked by the injection screen | 83% (10 of 12) | 78% |
+| Attacks blocked by the injection screen | 83% (10 of 12) | 80% |
 | Harmless issues wrongly blocked | 0% (0 of 15) | at most 10% |
 
-The lines for the four model-scored signals (outcome, triage, judge, attacks) sit 5 points below this run's result, which is recorded as the baseline in [`results/eval_baseline.json`](results/eval_baseline.json); a later run fails if any of them drops by more than that. The other lines are fixed.
+Every line was set before the results existed. This run is also recorded as a baseline in [`results/eval_baseline.json`](results/eval_baseline.json): a later run fails if a model-scored signal drops more than 5 points below it. Two grading changes were made after a run had been seen, and the report lists both under *Changes after the first run*. Counting only each test issue's original expected outcome, 9 of 14 reached it (64%).
 
 The evaluation combines:
 
