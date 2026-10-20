@@ -4,7 +4,7 @@
 
 Engineering teams lose hours every sprint to small, well-defined issues: a bug flagged by a test, a dependency bump, a missing paragraph in the docs. You label an issue `ai-assignable`; a team of AI agents finds the relevant code, makes the change in an isolated copy of the repository, runs the tests and prepares a pull request. Nothing reaches GitHub until you approve it.
 
-**Contents:** [Demo](#demo) · [How it works](#how-it-works) · [What's included](#whats-included) · [Quick start](#quick-start) · [Using it](#using-it) · [Connect your own repository](#connect-your-own-repository) · [Architecture](#architecture) · [Example pull requests](#example-pull-requests) · [Real project](#tested-on-a-real-project-layered-memory) · [Safety](#safety) · [Results](#results) · [Design choices](#design-choices) · [For reviewers](#for-reviewers-the-assignment-brief) · [Known limitations](#known-limitations)
+**Contents:** [Demo](#demo) · [How it works](#how-it-works) · [What's included](#whats-included) · [Quick start](#quick-start) · [Using it](#using-it) · [Connect your own repository](#connect-your-own-repository) · [Architecture](#architecture) · [Example pull requests](#example-pull-requests) · [Safety](#safety) · [Results](#results) · [Design choices](#design-choices) · [For reviewers](#for-reviewers-the-assignment-brief) · [Known limitations](#known-limitations)
 
 ## CodePilot+ in 30 seconds
 
@@ -56,7 +56,7 @@ flowchart LR
 |---|---|
 | **Brief** (required) | Issue polling every 5 minutes · triage into 5 task types · Orchestrator with Repo Explorer, Coder, Test Agent and PR Agent · repo map within a token budget · one skill per task type · sandboxed execution with a command guard · human approval gates · working, session and lesson memory · terminal UI with 4 panels · branch, commit and labelled pull request |
 | **Bonus** (optional in the brief) | Complexity score 1–10 · self-healing tests (a Test Doctor) · LangSmith tracing · Daytona cloud sandbox |
-| **Plus** (beyond the brief) | Prompt-injection screen on issue text · plans instead of code for complex issues · independent reviewer on every pull request · self-improvement loop with versioned repo skills · dashboard · evaluation suite with one verdict · one-command repository setup (`connect`) · tested on a real, shipped project (layered-memory) |
+| **Plus** (beyond the brief) | Prompt-injection screen on issue text · plans instead of code for complex issues · independent reviewer on every pull request · self-improvement loop with versioned repo skills · dashboard · evaluation suite with one verdict · one-command repository setup (`connect`) |
 
 ## Quick start
 
@@ -159,19 +159,6 @@ Blue boxes are AI agents or models, green boxes are plain code, orange boxes are
 
 [PR #28](https://github.com/LijiAlex/codepilot-playground/pull/28): a one-line fix plus regression tests, scored 10/10 and merge-ready. Branch `codepilot/issue-25-fix-empty-block-reason-leak-check`, commit `fix(#25): …`, labels `codepilot-generated`, `needs-review`.
 
-## Tested on a real project: layered-memory
-
-[`layered-memory`](https://github.com/LijiAlex/layered-memory) is a Claude Code memory plugin I had already built and shipped, with its own test suite: not a test fixture. Four genuine problems were reproduced on its `main` branch and handed to CodePilot+: three as issues labelled `ai-assignable` and picked up by the poller, one as a task typed into the terminal. Every pull request was scored merge-ready by the independent reviewer and merged.
-
-| Problem | How it arrived | Pull request |
-|---|---|---|
-| Accented letters in theme slugs became dashes | typed task | [#1](https://github.com/LijiAlex/layered-memory/pull/1) |
-| `read_transcript` crashed on a JSON line that is not an object | [issue #2](https://github.com/LijiAlex/layered-memory/issues/2) | [#5](https://github.com/LijiAlex/layered-memory/pull/5) |
-| `load_config` crashed when `config.json` could not be read | [issue #3](https://github.com/LijiAlex/layered-memory/issues/3) | [#8](https://github.com/LijiAlex/layered-memory/pull/8) |
-| The README documented 11 of 27 config options | [issue #4](https://github.com/LijiAlex/layered-memory/issues/4) | [#9](https://github.com/LijiAlex/layered-memory/pull/9) |
-
-Within a minute of the issues being filed, an outside account opened its own fork pull requests for two of them; the reviewer judged those from the diff alone and never ran their code. Two bugs in CodePilot+ surfaced during these runs and were fixed the same day (a provider credit failure counted against the issue, and a shell test run that was correctly refused as untested). These runs came after the final evaluation, so they are not in its numbers.
-
 ## Safety
 
 ### Guards
@@ -255,4 +242,4 @@ Done: complexity scoring, self-healing tests (a Test Doctor fixes a broken test 
 
 ## Credits
 
-The issue screen reuses my earlier bootcamp project, [guardrail-eval-pipeline](https://github.com/LijiAlex/guardrail-eval-pipeline), as a package; the test repository `codepilot-playground` is a copy of it with deliberately planted defects. Built with DeepAgents, LangGraph, LangChain, NeMo Guardrails, Textual, ChromaDB, PyGithub and Daytona.
+The issue screen reuses my earlier bootcamp project, [guardrail-eval-pipeline](https://github.com/LijiAlex/guardrail-eval-pipeline), as a package; two repositories served as playgrounds for testing: `codepilot-playground`, a copy of it with deliberately planted defects, and my Claude Code plugin [`layered-memory`](https://github.com/LijiAlex/layered-memory). Built with DeepAgents, LangGraph, LangChain, NeMo Guardrails, Textual, ChromaDB, PyGithub and Daytona.
