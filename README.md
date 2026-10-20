@@ -6,7 +6,7 @@ Engineering teams lose hours every sprint to small, well-defined issues: a bug f
 
 FILL: demo video link (5–7 minutes)
 
-FILL: `![CodePilot+ in the terminal](docs/tui.gif)`
+![CodePilot+ in the terminal: a poll runs, issue #13 is blocked by the injection screen, issue #25 is claimed and triaged](docs/tui.gif)
 
 ## How it works
 
@@ -58,13 +58,24 @@ Blue boxes are AI agents or models, green boxes are plain code, and orange boxes
 
 **A dashboard.** A local web page for everything the terminal does not show: every run and the stages it reached, open pull requests with their reviews (merge or close from there), every refused command and the rule behind it, memory and skills, the evaluation report, cost per run, and a complete audit log of who did what.
 
-FILL: `![Dashboard overview](docs/dashboard.png)`
+![Dashboard overview: issues solved, average review score, refused commands, skill changes and cost](docs/dashboard.png)
 
 ## Results
 
-FILL: one sentence on what was run (number of issues across the two test repositories) and the verdict from `results/eval.md`.
+The final evaluation (20 October 2026) covered 30 runs on 15 issues across the two test repositories: the 14 test issues written in advance for `codepilot-playground`, and one real issue on `layered-memory`. **Verdict: PASS** — every signal cleared its line. Full report: [`results/eval.md`](results/eval.md).
 
-FILL: the signals table from `results/eval.md`.
+| Signal | Result | Must reach |
+|---|---|---|
+| Rule checks passed | 100% (152 checks) | 100% |
+| Test issues that reached their expected outcome | 86% (12 of 14) | 81% |
+| Triage picked the right task type | 88% (25 runs) | 83% |
+| Hidden tests passed | 100% (6 pull requests) | 100% |
+| AI judge's mean score on CodePilot+'s pull requests | 9.8 / 10 (10 pull requests) | 9.3 / 10 |
+| Judge self-test probes answered correctly | 4 of 4 | 4 of 4 |
+| Attacks blocked by the injection screen | 83% (10 of 12) | 78% |
+| Harmless issues wrongly blocked | 0% (0 of 15) | at most 10% |
+
+The lines for the four model-scored signals (outcome, triage, judge, attacks) sit 5 points below this run's result, which is recorded as the baseline in [`results/eval_baseline.json`](results/eval_baseline.json); a later run fails if any of them drops by more than that. The other lines are fixed.
 
 The evaluation combines:
 
@@ -85,7 +96,11 @@ Injection screen on the 27 labelled issues — the harmless ones are deliberatel
 | Harmless issues wrongly blocked | 0 of 15 |
 | Median / slow (95th percentile) check time | 0.8 s / 1.3 s |
 
-FILL: example pull requests — one merged on `layered-memory`, one on `codepilot-playground`.
+Example pull requests opened by CodePilot+ and merged after review:
+
+- [layered-memory #1](https://github.com/LijiAlex/layered-memory/pull/1) — keep accented letters in theme slugs instead of turning them into dashes.
+- [codepilot-playground #19](https://github.com/LijiAlex/codepilot-playground/pull/19) — the same identifier is reported twice when the answer repeats it (scored 10/10 by the independent reviewer).
+- [codepilot-playground #14](https://github.com/LijiAlex/codepilot-playground/pull/14) — a citation marker reported out of range when the answer used three passages.
 
 FILL: `![One run traced in LangSmith](docs/langsmith.png)` — one run from Orchestrator to PR Agent; inputs and outputs are redacted before upload.
 
@@ -109,7 +124,7 @@ In the terminal app: label an issue `ai-assignable` and wait for the next check 
 
 To add the independent reviewer to a repository: `uv run python scripts/install_reviewer.py --repo OWNER/REPO --install "pip install -e . pytest" --create`, then add the secrets `OPENAI_API_KEY` and `REVIEWER_APP_KEY` and the variables `REVIEWER_APP_ID`, `REVIEWER_LOGIN` and `CODEPILOT_LOGIN` in the repository's settings.
 
-Run the tests: `uv run pytest` (FILL: test count).
+Run the tests: `uv run pytest` (431 tests).
 
 ## Design choices
 

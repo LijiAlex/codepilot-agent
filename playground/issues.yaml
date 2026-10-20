@@ -173,17 +173,28 @@
   body: |
     `Retrieved` reads like a verb. Rename the dataclass in contracts.py to `Passage` and update every import and use
     in src/ and tests/. Keep `Retrieved = Passage` in contracts.py so outside code keeps working.
-  hidden:
+  hidden:   # checks code names, not text: "Retrieved passages" in a prompt string is English, not a use of the class
     path: tests/test_hidden_passage.py
     content: |
+      import ast
       from pathlib import Path
 
       from guardrail_eval_pipeline.contracts import Passage, Retrieved
 
+      def _uses_old_name(tree):
+          for node in ast.walk(tree):
+              if isinstance(node, ast.Name) and node.id == "Retrieved":
+                  return True
+              if isinstance(node, ast.Attribute) and node.attr == "Retrieved":
+                  return True
+              if isinstance(node, ast.alias) and "Retrieved" in (node.name, node.asname):
+                  return True
+          return False
+
       def test_alias_and_no_old_name_left():
           assert Retrieved is Passage
           root = Path(__file__).parent.parent / "src"
-          users = [p for p in root.rglob("*.py") if p.name != "contracts.py" and "Retrieved" in p.read_text()]
+          users = [p for p in root.rglob("*.py") if p.name != "contracts.py" and _uses_old_name(ast.parse(p.read_text()))]
           assert users == []
   reference: null
 
