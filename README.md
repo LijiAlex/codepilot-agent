@@ -103,9 +103,19 @@ Injection screen on the 27 labelled issues — the harmless ones are deliberatel
 | Harmless issues wrongly blocked | 0 of 15 |
 | Median / slow (95th percentile) check time | 0.8 s / 1.3 s |
 
-Example pull requests opened by CodePilot+ and merged after review:
+**On a real, shipped project.** [`LijiAlex/layered-memory`](https://github.com/LijiAlex/layered-memory) is a Claude Code plugin with its own test suite, not a test fixture. Four genuine problems were reproduced on its `main` branch, given to CodePilot+, and fixed: one as a task typed into the terminal, three as issues labelled `ai-assignable` and picked up by the poller. Each pull request was scored merge-ready by the independent reviewer and merged by a person. (These runs came after the evaluation above, so they are not in its numbers.)
 
-- [layered-memory #1](https://github.com/LijiAlex/layered-memory/pull/1) — keep accented letters in theme slugs instead of turning them into dashes.
+| Problem | Pull request |
+|---|---|
+| Accented letters in theme slugs became dashes | [#1](https://github.com/LijiAlex/layered-memory/pull/1) |
+| `read_transcript` crashed on a JSON line that is not an object ([issue #2](https://github.com/LijiAlex/layered-memory/issues/2)) | [#5](https://github.com/LijiAlex/layered-memory/pull/5) |
+| `load_config` crashed when `config.json` could not be read ([issue #3](https://github.com/LijiAlex/layered-memory/issues/3)) | [#8](https://github.com/LijiAlex/layered-memory/pull/8) |
+| The README documented 11 of 27 config options ([issue #4](https://github.com/LijiAlex/layered-memory/issues/4)) | [#9](https://github.com/LijiAlex/layered-memory/pull/9) |
+
+Two problems surfaced in these runs and were fixed the same day: a run that failed because the model provider refused the account (no API credit) was counted as the issue's own failure and blocked its retry, and a coder that verified with a shell `pytest` instead of `run_tests` had its run correctly refused as untested; the guard now tells the agent that shell test runs do not count. Within a minute of the issues being filed, an outside account also opened its own fork pull requests for two of them; the reviewer scored those from the diff alone and never ran their code.
+
+Example pull requests on the test repository, merged after review:
+
 - [codepilot-playground #19](https://github.com/LijiAlex/codepilot-playground/pull/19) — the same identifier is reported twice when the answer repeats it (scored 10/10 by the independent reviewer).
 - [codepilot-playground #14](https://github.com/LijiAlex/codepilot-playground/pull/14) — a citation marker reported out of range when the answer used three passages.
 
