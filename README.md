@@ -201,6 +201,16 @@ When an agent tries one anyway, it gets the reason and the safer alternative in 
 
 Fixing the arguments at approval also means the pull request contains exactly what the person approved: the agent cannot change the text or the files between approval and publishing, and GitHub credentials never enter the sandbox. The Toolkit is still used where it fits, to read issues in the poller.
 
+**Why skills are loaded by CodePilot+ instead of DeepAgents' skills middleware.** The brief names `deepagents.skills` as the mechanism. In DeepAgents 0.7.23 that module does not exist (importing it fails); skills come through `SkillsMiddleware`, which works differently from what the brief asks:
+
+| The brief asks | DeepAgents' `SkillsMiddleware` | CodePilot+ |
+|---|---|---|
+| The Orchestrator selects the skill by task type | Lists every skill's name and description in the prompt and lets the model pick one to read | Triage decides the task type; code loads that one skill |
+| The skill is passed to the subagent at spawn time | The model reads the file when it decides to | Each subagent's prompt gets the skill when it is created; the Repo Explorer and the Test Agent get only their part of it |
+| Structured `name`, `instructions`, `workflow_steps`, `example_prompts`, `forbidden_actions` | Keeps name, description, licence, allowed tools and a flat text map | All five, validated into a typed `Skill` object |
+
+The file format is the same: each skill is a `SKILL.md` with standard Agent Skills frontmatter, and DeepAgents' own parser reads all five skill files. The brief's fields sit in a `codepilot:` block inside that frontmatter, so the files would work with `SkillsMiddleware` too; only the selection is done by code, as the brief describes.
+
 Bonus items done: self-healing tests (a test-doctor agent fixes broken test setup once), complexity scoring, LangSmith tracing, and the Daytona cloud sandbox.
 
 ## Credits
