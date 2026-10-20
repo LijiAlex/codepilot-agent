@@ -4,7 +4,14 @@
 
 Engineering teams lose hours every sprint to small, well-defined issues: a bug flagged by a test, a dependency bump, a missing paragraph in the docs. CodePilot+ takes those off the queue. You label an issue `ai-assignable`; a team of AI agents reads it, finds the relevant code, makes the change in an isolated copy of the repository, runs the tests, and prepares a pull request. Nothing reaches GitHub until you approve it in the terminal.
 
-FILL: demo video link (5–7 minutes)
+**Watch and read**
+
+| | What it shows | Length |
+|---|---|---|
+| ▶ **Demo** — FILL: demo YouTube link | Issue polling, a full run from issue to pull request, a human approval, a guardrail block, and every dashboard tab | 5 min 13 s |
+| ▶ **Architecture walkthrough** — FILL: architecture YouTube link | Every box on the architecture diagram, explained in order | 8 min 50 s |
+| ▶ **Pitch** — FILL: pitch YouTube link | CodePilot+ in 30 seconds | 30 s |
+| 📄 **Slide deck** — FILL: deck link | What is included (brief, bonus and beyond), how one issue flows through, the evaluation and results | 18 slides |
 
 ![CodePilot+ in the terminal: a poll runs, issue #13 is blocked by the injection screen, issue #25 is claimed and triaged](docs/tui.gif)
 
