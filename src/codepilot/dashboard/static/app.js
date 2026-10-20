@@ -8,7 +8,7 @@ const PAGES = [
   ["safety", "Safety", "What the guardrails refused or held back, and the measured injection screen."],
   ["audit", "Audit log", "Every action, by whom, in order."],
   ["improvements", "Improvements", "Proposed changes to a repository's skill, waiting for a person, and how runs went per skill version."],
-  ["memory", "Memory", "Lessons learned from past work, and a summary of each recent session."],
+  ["memory", "Memory", "Lessons learned from past work."],
   ["skills", "Skills", "The five task skills and each repository's own skill (its versions)."],
   ["context", "Context", "How much context runs were given: the repo map per repository against its budget, and the lessons each run recalled."],
 ];
@@ -451,12 +451,6 @@ const render = {
     m.appendChild(el("p", "Written when a PR is merged (and from failures or rejections); recalled for later runs on the same repository.", "muted"));
     const all = Object.entries(d.lessons).flatMap(([repo, ls]) => ls.map(l => [repo.split("/").pop(), words(l.task_type), l.source, td(runLink(l.run_id)), l.text]));
     m.appendChild(table(["Repo", "Type", "Source", "From run", "Lesson"], all));
-    const sessions = d.sessions.filter(s => s.summary && s.summary !== "no runs");
-    const box = el("details"); box.appendChild(el("summary", "Recent sessions (" + sessions.length + ")"));
-    const note = el("p", "Each summary is a snapshot taken when that session ended. For each run's current status, see ", "muted");
-    const toRuns = el("a", "Runs"); toRuns.href = "#runs"; note.appendChild(toRuns); note.appendChild(document.createTextNode(".")); box.appendChild(note);
-    box.appendChild(table(["Started", "Summary (at session end)"], sessions.map(s => [when(s.started), tdTitle(short(friendlySummary(s.summary), 120), friendlySummary(s.summary))])));
-    m.appendChild(box);
   },
   async skills(m) {
     const d = await api("skills");
