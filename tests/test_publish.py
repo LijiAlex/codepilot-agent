@@ -26,7 +26,9 @@ class PubRepo(FakeRepo):
         self.compare_files, self.fail_pull = [], False
     def get_issue(self, n): return self.issue
     def get_branch(self, name): return NS(commit=NS(sha=self.refs[f"heads/{name}"]))
-    def compare(self, base, head): return NS(files=self.compare_files)
+    def compare(self, base, head):                # changed files are set per test; ahead_by is computed from the commits
+        ahead = super().compare(base, head).ahead_by if head in self.refs or f"heads/{head}" in self.refs or head in self.commits else 0
+        return NS(files=self.compare_files, ahead_by=ahead)
     def create_pull(self, **kw):
         if self.fail_pull:
             self.fail_pull = False

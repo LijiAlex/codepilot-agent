@@ -77,9 +77,12 @@ class GitWriter:
         validate_message(message, self.issue_number, self.run_id)
         ref = self.repo.get_git_ref(f"heads/{branch}")
         parent = self.repo.get_git_commit(ref.object.sha)
-        if run_trailer(self.run_id) in parent.message:
+        # only commits the branch has on top of the default branch are its own; the top of a fresh branch is just main's
+        # latest commit, which carries another run's trailer whenever a CodePilot+ PR was the last thing merged
+        own = self.repo.compare(self.repo.default_branch, branch).ahead_by > 0
+        if own and run_trailer(self.run_id) in parent.message:
             return parent.sha                                                # this run's commit is already there
-        if "CodePilot-Run: " in parent.message:
+        if own and "CodePilot-Run: " in parent.message:
             raise PublishError(f"branch {branch} already holds another run's commit; use a new branch name")
         if not self.saved:
             raise PublishError("the saved change is empty")

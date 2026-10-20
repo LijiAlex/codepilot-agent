@@ -56,6 +56,16 @@ class FakeRepo:
 
     def get_git_commit(self, sha): return self.commits[sha]
 
+    def compare(self, base, head):                    # ahead_by: commits on head that base does not have
+        def ancestors(ref):
+            sha = self.refs.get(f"heads/{ref}", ref); seen = set(); todo = [sha]
+            while todo:
+                c = todo.pop()
+                if c not in seen:
+                    seen.add(c); todo += [p.sha for p in self.commits[c].parents]
+            return seen
+        return NS(ahead_by=len(ancestors(head) - ancestors(base)))
+
     def create_git_blob(self, content, encoding):
         assert encoding == "base64"; base64.b64decode(content, validate=True)
         sha = f"blob{len(self.blobs)}"; self.blobs[sha] = content; return NS(sha=sha)
@@ -157,3 +167,16 @@ def test_bad_title_and_empty_change():
         w.create_pull_request("codepilot/issue-7-x", "Handle empty title", "b")
     with pytest.raises(PublishError, match="empty"):
         writer(repo, saved=[]).create_commit("codepilot/issue-7-x", MSG)
+
+
+def test_a_merged_codepilot_pr_on_main_does_not_block_the_next_branch():
+    # live 2026-10-20: after PRs were merged from the dashboard, main's top commit carried another run's
+    # CodePilot-Run trailer, so every new branch cut from main was refused as "another run's commit"
+    repo = FakeRepo()
+    repo.commits["merged"] = NS(sha="merged", message="fix(#3): docs (#15)\n\nCodePilot-Run: oldrun", tree=NS(sha="t0"),
+                                parents=[repo.commits["base"]])
+    repo.refs["heads/main"] = "merged"
+    w = writer(repo, run_id="r9")
+    w.create_branch("codepilot/issue-7-empty-title", start_sha="merged")
+    sha = w.create_commit("codepilot/issue-7-empty-title", MSG)
+    assert repo.commits[sha].parents[0].sha == "merged" and "CodePilot-Run: r9" in repo.commits[sha].message
