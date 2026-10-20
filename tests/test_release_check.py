@@ -38,9 +38,10 @@ def test_main_needs_the_outside_word_list(tmp_path, capsys):
     assert cr.main(["--repo", str(tmp_path), "--forbidden", str(tmp_path / "missing.txt")]) == 2
 
 
-def test_readme_has_every_section_and_blocks_release_until_filled(tmp_path):
+def test_readme_has_every_section_and_no_fill_markers_left(tmp_path):
     tpl = (ROOT / "README.md").read_text()
     r = repo_with(tmp_path, {"README.md": tpl})
     probs = cr.check(r, [])
-    assert not [p for p in probs if "section missing" in p or "build tier" in p]
-    assert any("FILL: marker" in p for p in probs)
+    assert not [p for p in probs if "section missing" in p or "build tier" in p or "FILL: marker" in p]
+    (tmp_path / "t").mkdir()
+    assert cr.check(repo_with(tmp_path / "t", {"README.md": tpl + "\nFILL: demo link\n"}), [])  # a marker still blocks
