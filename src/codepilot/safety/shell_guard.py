@@ -1,12 +1,18 @@
 # src/codepilot/safety/shell_guard.py
 from __future__ import annotations
 
+import re
+
 from langchain.agents.middleware import wrap_tool_call
 from langchain_core.messages import ToolMessage
 from langgraph.types import interrupt
 
 from codepilot.audit import AuditLog
 from codepilot.safety.commands import classify_command, rule_for, unknown_parts
+
+_PYTEST = re.compile(r"\bpytest\b")
+SHELL_TESTS_NOTE = ("\n[CodePilot+] Tests run through the shell do not count as verification. "
+                    "Call run_tests(purpose=\"verify\") so the result is recorded.")
 
 
 def make_shell_guard(audit: AuditLog, run_id: str, agent: str, approved_commands: frozenset[str] | set[str] = frozenset()):
@@ -29,6 +35,9 @@ def make_shell_guard(audit: AuditLog, run_id: str, agent: str, approved_commands
                       detail={"reason": c.reason, "rule": rule_for(c.reason)})
             interrupt({"gate": "unexpected_command", "command": cmd, "agent": agent, "reason": c.reason})
         audit.log(f"agent:{agent}", "command_run", run_id=run_id, target=cmd)
-        return handler(request)
+        result = handler(request)
+        if _PYTEST.search(cmd) and isinstance(result, ToolMessage):    # only run_tests results count (worker verification)
+            result.content = f"{result.content}{SHELL_TESTS_NOTE}"
+        return result
 
     return shell_guard

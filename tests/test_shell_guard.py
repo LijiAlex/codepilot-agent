@@ -65,3 +65,12 @@ def test_a_variant_of_an_approved_command_does_not_ask_again(tmp_path):
             seen += [i.value for i in data["__interrupt__"]]
     assert seen == []
     assert audit.conn.execute("select count(*) from events where action='command_needs_decision'").fetchone()[0] == 0
+
+def test_tests_run_through_the_shell_are_flagged_as_not_counting(tmp_path):
+    # live 2026-10-20 (layered-memory #4): the coder ran pytest via execute, never run_tests, and the run ended "untested"
+    agent, _ = _agent(tmp_path, [tool_call("execute", {"command": "cd sandbox && python -m pytest -q 2>&1 | tail -n 5"}, "1"),
+                                 tool_call("execute", {"command": "ls"}, "2"), AIMessage(content="ok")])
+    out = agent.invoke({"messages": [{"role": "user", "content": "x"}]}, {"configurable": {"thread_id": "t"}})
+    tool_msgs = [m for m in out["messages"] if m.type == "tool"]
+    assert "do not count as verification" in tool_msgs[0].content and "run_tests" in tool_msgs[0].content
+    assert "do not count" not in tool_msgs[1].content
