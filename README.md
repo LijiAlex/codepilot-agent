@@ -102,7 +102,9 @@ Example pull requests opened by CodePilot+ and merged after review:
 - [codepilot-playground #19](https://github.com/LijiAlex/codepilot-playground/pull/19) — the same identifier is reported twice when the answer repeats it (scored 10/10 by the independent reviewer).
 - [codepilot-playground #14](https://github.com/LijiAlex/codepilot-playground/pull/14) — a citation marker reported out of range when the answer used three passages.
 
-FILL: `![One run traced in LangSmith](docs/langsmith.png)` — one run from Orchestrator to PR Agent; inputs and outputs are redacted before upload.
+![One run traced in LangSmith: the Orchestrator reads issue #25 and hands the fix to the coder subagent, with time, tokens and cost per step](docs/langsmith.png)
+
+*One run traced in LangSmith: the Orchestrator reads issue #25 and delegates to the coder subagent; each model call shows its time, tokens and cost. Secrets are scrubbed from every input and output before a trace leaves the machine.*
 
 ## Try it
 
