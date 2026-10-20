@@ -17,6 +17,8 @@ Engineering teams lose hours every sprint to small, well-defined issues: a bug f
 
 ![The terminal UI: a poll runs, issue #13 is blocked by the injection screen, issue #25 is claimed and triaged](docs/tui.gif)
 
+*The terminal UI during a live run. Top left: every issue picked up and its status (the title shows the 5-minute poll). Top right: the task in progress. Bottom left: the agent log, where issue #13 is blocked by the injection screen and #25 is triaged as a bug fix. Bottom right: items waiting for your approval (`a` approve, `r` reject, `v` inspect).*
+
 ## How it works
 
 ```mermaid
