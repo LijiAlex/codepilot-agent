@@ -180,6 +180,17 @@ CodePilot+ was built for the AI Engineering Bootcamp capstone brief *Multi-Agent
 | The diff preview in `working/proposed_diff.txt` | In `/shared/proposed_diff.txt`, the agents' shared working folder | Same folder as the repo map and task state |
 | Skip issues above the complexity threshold (bonus) | Labelled issues above it get a plan for you to approve; unlabelled ones are skipped | A person asked for the work, so a plan is more useful than silence |
 
+**Why the blocked commands are refused instead of sent to a person.** The brief blocks `rm -rf`, `curl`, `wget`, `pip install` and paths outside the sandbox, and asks for a person's approval before `git push`. In CodePilot+ none of these is ever needed, so approving one could only let something unnecessary run:
+
+| Command | Why it is never needed |
+|---|---|
+| `git push` | The sandbox holds no credentials and no GitHub remote. The only push is the publish step, and it runs after a person approves the pull request, so the brief's gate (a person approves before anything is pushed) sits on publishing. |
+| `rm -rf` | Changes are made with `edit_file`; there is nothing to wipe. |
+| `curl`, `wget` | Network access the agents need goes through a tool, for example `fetch_changelog` for dependency updates. |
+| `pip install` | Dependencies are installed when the run starts. For a dependency change the agent edits the manifest and the `reinstall_dependencies` tool reinstalls. |
+
+When an agent tries one anyway, it gets the reason and the safer alternative in the refusal, and the attempt is recorded on the dashboard's Safety tab and in the audit log. Across all runs so far, 18 such attempts were refused, and the evaluation's rule check found no run that retried a refused command.
+
 Bonus items done: self-healing tests (a test-doctor agent fixes broken test setup once), complexity scoring, LangSmith tracing, and the Daytona cloud sandbox.
 
 ## Credits
