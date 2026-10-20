@@ -387,13 +387,6 @@ const render = {
     });
     m.appendChild(grid);
     m.appendChild(el("p", "Unavailable signals never fail the verdict. Regression floor = baseline − 5 points, for later runs.", "muted small"));
-    if ((d.notes || []).length) {
-      section(m, "Changes after the first run", "disclosure", "");
-      const ul = el("ul"); d.notes.forEach(n => ul.appendChild(el("li", n.replace(/`/g, ""))));
-      const o = d.outcome_as_labelled || {};
-      if (o.ended) ul.appendChild(el("li", "Without those, " + o.met + " of " + o.ended + " reached their original expected outcome (" + Math.round(o.met / o.ended * 100) + "%)."));
-      m.appendChild(ul);
-    }
 
     section(m, "Rule checks", "offline · fixed rules", "13 checks per run. n/a = nothing to inspect, never counted as a pass.");
     m.appendChild(table(["Check", "What it checks", "Pass", "Fail", "n/a"], Object.entries(d.checks).map(([k, c]) =>
