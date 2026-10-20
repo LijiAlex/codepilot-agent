@@ -20,7 +20,6 @@ const SIGNAL_NAMES = { heuristics_pass_rate: "Rule checks passed", expected_outc
   judge_probes: "Judge probes right", injection_blocked: "Attacks blocked", false_alarms: "False alarms" };
 const PROBE_NAMES = { "deleted-test": "Deletes the failing test", "off-topic": "Change unrelated to the issue",
   "hardcoded-secret": "Hard-coded key", "correct-fix": "Correct fix (control)" };
-function rubricText(r) { const e = Object.entries(r || {}); return e.length ? e.map(([k, v]) => k + " " + v + "/2").join(" · ") : ""; }
 const STATUS = { PR_OPENED: "PR opened", AWAITING_APPROVAL: "Waiting for approval", FAILED: "Failed", DONE: "Merged",   // one casing style: sentence case
   CLOSED: "Closed", SKIPPED: "Skipped", EXPLORING: "Exploring", IMPLEMENTING: "Implementing", TESTING: "Testing", TRIAGED: "Triaged" };
 let token = "";
@@ -110,11 +109,14 @@ function scoreText(f) {                // "6/10 (capped: tests not run · rubric
   const why = String(f.cap).replace(/^capped at \d+:\s*/, "");
   return f.score + "/10 (capped: " + why + (Object.keys(f.rubric || {}).length ? " · rubric " + sum : "") + ")";
 }
-function rubricCell(f) {                // "C2 T1 M2 R2 S1"; the reviewer's reason for each on hover
-  const r = f.rubric || {}, why = f.rubric_reasons || {};
-  if (!Object.keys(r).length) return el("td", "—", "muted");
-  const c = el("td", RUBRIC.filter(([k]) => k in r).map(([k, a]) => a + r[k]).join(" "), "rubric");
-  c.title = RUBRIC.filter(([k]) => k in r).map(([k]) => k + " " + r[k] + "/2" + (why[k] ? ": " + why[k] : "")).join("\n");
+function rubricCell(f, why = {}) {      // one Score column: "9/10" (or why it was capped), "C2 T1 M2 R2 S2" under it, reasons on hover
+  const r = f.rubric || {}, c = el("td", null, "score");
+  if (f.score === null || f.score === undefined) return el("td", "");
+  c.appendChild(el("div", scoreText(f)));
+  if (Object.keys(r).length) {
+    c.appendChild(el("div", RUBRIC.filter(([k]) => k in r).map(([k, a]) => a + r[k]).join(" "), "rubric small muted"));
+    c.title = RUBRIC.filter(([k]) => k in r).map(([k]) => k + " " + r[k] + "/2" + (why[k] ? ": " + why[k] : "")).join("\n");
+  }
   return c;
 }
 function details(summary, body) { const d = el("details"), s = el("summary", summary); d.appendChild(s); d.appendChild(el("pre", body)); return d; }
@@ -288,7 +290,7 @@ const render = {
       if (prsIn.error) { m.appendChild(el("p", "Could not load: " + prsIn.error, "muted")); continue; }
       if (!prsIn.length) { m.appendChild(el("p", "No open pull requests in this repository.", "muted")); continue; }
       const prs = [...prsIn].sort((a, b) => (b.attention || []).length - (a.attention || []).length);
-      m.appendChild(table(["", "PR", "Run", "Score", "Rubric", "Effort", "Merge-ready", "Matches the issue", "Security", "Reviews", "Review cost", "Actions", "Review", "Labels", "Author"], prs.map(p => {
+      m.appendChild(table(["", "PR", "Run", "Score", "Effort", "Merge-ready", "Matches the issue", "Security", "Reviews", "Review cost", "Actions", "Review", "Labels", "Author"], prs.map(p => {
         const f = (p.review && p.review.fields) || {}, u = p.review_usage || {};
         const att = el("td", null, (p.attention || []).length ? "attention" : "");
         if ((p.attention || []).length) { att.appendChild(el("span", "⚠ ", "warn")); att.appendChild(el("span", p.attention.join(", "))); att.title = "A person should look at this PR"; }
@@ -308,7 +310,7 @@ const render = {
         const rev = el("td");
         if (p.review) { rev.appendChild(details(p.review.current ? "full review" : "full review (older commit)", p.review.body)); } else rev.appendChild(el("span", "not reviewed yet", "muted"));
         return [att, td(link("#" + p.number + " " + p.title, p.url)), p.run_id ? td(runLink(p.run_id)) : el("td", "not from CodePilot+", "muted"),
-          f.score === null || f.score === undefined ? "" : tdTitle(scoreText(f), f.cap), rubricCell(f),
+          rubricCell(f, f.rubric_reasons || {}),
           f.effort === null || f.effort === undefined ? "" : f.effort + "/5", ready, f.matches || "",
           (f.security || []).length ? el("td", f.security.join("; "), "failed") : "none",
           u.count ? num(u.count) : "—", u.count ? "$" + Number(u.cost || 0).toFixed(3) : "—", actions, rev, p.labels.join(", "),
@@ -349,13 +351,12 @@ const render = {
 
     m.appendChild(el("h2", "Judge: the independent reviewer"));
     m.appendChild(el("p", "The agents write code on Claude; the reviewer grades on an OpenAI model, so the system never grades its own work. Probes are fixed pull requests that never come from CodePilot+: the three bad ones must score below the merge line, the correct fix above it.", "muted"));
-    m.appendChild(table(["Probe", "Expected", "Score", "Rubric", "Merge-ready", "Judge right?"], (d.probe_rows || []).map(p => [
-      PROBE_NAMES[p.key] || p.key, p.expect === "reject" ? "reject" : "accept", p.score + "/10", rubricText(p.rubric),
+    m.appendChild(table(["Probe", "Expected", "Score", "Merge-ready", "Judge right?"], (d.probe_rows || []).map(p => [
+      PROBE_NAMES[p.key] || p.key, p.expect === "reject" ? "reject" : "accept", rubricCell(p),
       p.merge_ready ? "yes" : "no", el("td", p.behaved ? "✓ yes" : "✗ no", p.behaved ? "done" : "failed")])));
     m.appendChild(el("h3", "Scores on CodePilot+ pull requests"));
-    m.appendChild(table(["PR", "Run", "Score", "Rubric", "Merge-ready"], (d.judge || []).map(j => [
-      td(link(j.repo + "#" + j.pr, "https://github.com/" + j.repo + "/pull/" + j.pr)), td(runLink(j.run_id)), j.score + "/10",
-      rubricText(j.rubric) || el("td", "older review format (no rubric)", "muted"), j.merge_ready === true ? "yes" : j.merge_ready === false ? "no" : ""])));
+    m.appendChild(table(["PR", "Run", "Score", "Merge-ready"], (d.judge || []).map(j => [
+      td(link(j.repo + "#" + j.pr, "https://github.com/" + j.repo + "/pull/" + j.pr)), td(runLink(j.run_id)), rubricCell(j), j.merge_ready === true ? "yes" : j.merge_ready === false ? "no" : ""])));
 
     m.appendChild(el("h2", "Golden issues"));
     m.appendChild(el("p", "Issues filed on the playground with the outcome CodePilot+ should reach. A PR's hidden test is never shown to the agents; it is added to the PR's code afterwards and must pass.", "muted"));

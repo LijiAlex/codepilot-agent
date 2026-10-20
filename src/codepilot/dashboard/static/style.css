@@ -81,7 +81,8 @@ tr:hover > td:not([class]) { background-color: color-mix(in srgb, var(--accent) 
 .table-wrap th:first-child { background: var(--sunk); }
 td.title { min-width: 220px; }
 td.actions button { margin: 0 4px 4px 0; }
-td.rubric { font-family: var(--mono); font-size: 12px; white-space: nowrap; cursor: help; }
+td.score { white-space: nowrap; cursor: help; }
+td.score .rubric { font-family: var(--mono); font-size: 11.5px; margin-top: 2px; }
 tr.older td { opacity: .7; }
 /* stage marks: a tinted cell with a coloured edge reads at a glance without shouting */
 td.done { background: color-mix(in srgb, var(--ok) 13%, var(--card)); color: var(--ok); font-weight: 600; }
