@@ -124,7 +124,7 @@ In the terminal app: label an issue `ai-assignable` and wait for the next check 
 
 To add the independent reviewer to a repository: `uv run python scripts/install_reviewer.py --repo OWNER/REPO --install "pip install -e . pytest" --create`, then add the secrets `OPENAI_API_KEY` and `REVIEWER_APP_KEY` and the variables `REVIEWER_APP_ID`, `REVIEWER_LOGIN` and `CODEPILOT_LOGIN` in the repository's settings.
 
-Run the tests: `uv run pytest` (431 tests).
+Run the tests: `uv run pytest` (435 tests).
 
 ## Design choices
 
