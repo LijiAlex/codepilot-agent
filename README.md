@@ -191,6 +191,16 @@ CodePilot+ was built for the AI Engineering Bootcamp capstone brief *Multi-Agent
 
 When an agent tries one anyway, it gets the reason and the safer alternative in the refusal, and the attempt is recorded on the dashboard's Safety tab and in the audit log. Across all runs so far, 18 such attempts were refused, and the evaluation's rule check found no run that retried a refused command.
 
+**Why publishing uses fixed tools instead of the GitHub Toolkit's write tools.** The brief gives the PR Agent the Toolkit's `create_branch`, `create_commit` and `create_pull_request`. CodePilot+ keeps those three steps and their names, and the PR Agent still calls them in that order, but each tool takes no arguments: the branch, commit message, title and body were fixed when the person approved. Three limits of the Toolkit (checked in `langchain-community` 0.4.2) made its own write tools unusable here:
+
+| Toolkit limit | Effect |
+|---|---|
+| Its tool names contain spaces and brackets ("Create a new branch", "List open pull requests (PRs)") | Claude's and OpenAI's APIs accept only letters, digits, `_` and `-` in tool names, so the tools are rejected as they are |
+| "Create File" and "Update File" each make their own commit | A change to three files becomes three commits; the brief asks for one commit in its own format |
+| None of its 24 actions adds labels | The brief requires the `codepilot-generated` and `needs-review` labels on every pull request |
+
+Fixing the arguments at approval also means the pull request contains exactly what the person approved: the agent cannot change the text or the files between approval and publishing, and GitHub credentials never enter the sandbox. The Toolkit is still used where it fits, to read issues in the poller.
+
 Bonus items done: self-healing tests (a test-doctor agent fixes broken test setup once), complexity scoring, LangSmith tracing, and the Daytona cloud sandbox.
 
 ## Credits
