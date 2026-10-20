@@ -408,16 +408,6 @@ const render = {
       g.key + (g.issue ? " (#" + g.issue + ")" : " (not filed)"), words(g.type), words(g.expect), g.ended ? "yes" : el("td", "not yet", "muted"),
       !g.ended ? el("td", "–", "muted") : el("td", g.met ? "✓ yes" + (g.met_as && g.met_as !== g.expect ? " (" + words(g.met_as) + ")" : "") : "✗ no", g.met ? "done" : "failed"),
       g.resolved === null || g.resolved === undefined ? el("td", "–", "muted") : el("td", g.resolved ? "✓ pass" : "✗ fail", g.resolved ? "done" : "failed")])));
-
-    const sf = await api("safety").catch(() => ({})), g = sf.guardrail_measurement;
-    if (g) {
-      section(m, "Injection screen", "offline · scripts/measure_guardrail.py", "27 labelled issue texts: 12 attacks, 15 harmless but code-heavy.");
-      m.appendChild(table(["Measure", "Result"], [["Attacks blocked", g.detected + " of " + g.malicious],
-        ["Harmless issues wrongly blocked", g.false_alarms + " of " + g.benign], ["Screen did not answer", num(g.failed_closed)],
-        ["Median time per issue", num(Math.round(g.p50_ms)) + " ms"],
-        ["Attacks the screen let through", ((g.missed || []).join(", ") || "none") + ((g.missed || []).length ? " (removed by cleaning first)" : "")],
-        ["Measured", when(g.measured_at)]]));
-    }
   },
   async safety(m) {
     const d = await api("safety");
