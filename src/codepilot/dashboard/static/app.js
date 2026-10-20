@@ -105,6 +105,27 @@ function filterInput(placeholder, onChange) { const i = el("input", null, "filte
 const EFFORT_HELP = "1 = one file, up to 20 lines\n2 = two files or over 20 lines\n3 = three or more files, or over 80 lines\n"
   + "4 = over 250 lines\n5 = over 600 lines, or anything under .github/\nPackaging or lock files (pyproject.toml, requirements, *.lock) make it at least 3";
 const RUBRIC = [["correctness", "C"], ["tests", "T"], ["matches the issue", "M"], ["risk", "R"], ["scope", "S"]];
+function legend() {                      // how to read the Score and Effort columns, as two small blocks
+  const box = el("div", null, "legend");
+  const block = (title, intro, rows, foot) => {
+    const b = el("div", null, "legend-block");
+    b.appendChild(el("b", title)); b.appendChild(el("p", intro, "muted small"));
+    const dl = el("dl");
+    rows.forEach(([k, v]) => { dl.appendChild(el("dt", k)); dl.appendChild(el("dd", v)); });
+    b.appendChild(dl);
+    if (foot) b.appendChild(el("p", foot, "muted small"));
+    return b;
+  };
+  box.appendChild(block("Score (0–10)", "The independent reviewer scores five things, 0–2 each, and they add up to the score.",
+    [["C", "Correctness: does the code do what it claims?"], ["T", "Tests: are there tests for the change?"],
+     ["M", "Matches the issue: no more, no less"], ["R", "Risk: edge cases and side effects handled"], ["S", "Scope: focused, no unrelated changes"]],
+    "Capped at 4 if there are security concerns, at 6 if the tests did not run or failed."));
+  box.appendChild(block("Effort (1–5)", "How much work the change is for a person to review. Computed from the diff, not by the AI.",
+    [["1", "one file, up to 20 lines"], ["2", "two files, or over 20 lines"], ["3", "three or more files, or over 80 lines"],
+     ["4", "over 250 lines"], ["5", "over 600 lines, or anything under .github/"]],
+    "Packaging or lock files (pyproject.toml, requirements, *.lock) make it at least 3."));
+  return box;
+}
 function rubricCell(f, why = {}) {      // one Score column: "9/10" (or why it was capped), "C2 T1 M2 R2 S2" under it, reasons on hover
   const r = f.rubric || {}, c = el("td", null, "score");
   if (f.score === null || f.score === undefined) return el("td", "");
@@ -282,9 +303,7 @@ const render = {
   },
   async prs(m) {
     const d = await api("prs");
-    m.appendChild(el("p", "Rubric: C correctness · T tests · M matches the issue · R risk · S scope, 0–2 each. They add up to the score "
-      + "unless a cap applies (security concerns cap it at 4; tests not run or failing cap it at 6). Effort is how much work the "
-      + "change is for a person to review, computed from the diff (not by the AI): " + EFFORT_HELP.replace(/\n/g, "; ") + ".", "muted small"));
+    m.appendChild(legend());
     for (const [repo, prsIn] of Object.entries(d)) {
       m.appendChild(el("h2", repo));
       if (prsIn.error) { m.appendChild(el("p", "Could not load: " + prsIn.error, "muted")); continue; }

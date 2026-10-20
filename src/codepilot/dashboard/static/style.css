@@ -86,7 +86,7 @@ td.score .warn-text { color: var(--amber); margin-top: 2px; }
 td.review { min-width: 110px; }
 td.review details[open] { min-width: 480px; }                 /* an opened review gets room to read */
 td.review pre { white-space: pre-wrap; word-break: normal; overflow-wrap: anywhere; max-height: 420px; overflow-y: auto; }
-td.score .rubric { font-family: var(--mono); font-size: 11.5px; margin-top: 2px; }
+td.score .rubric { font-family: var(--mono); font-size: 11.5px; margin-top: 2px; white-space: nowrap; }
 tr.older td { opacity: .7; }
 /* stage marks: a tinted cell with a coloured edge reads at a glance without shouting */
 td.done { background: color-mix(in srgb, var(--ok) 13%, var(--card)); color: var(--ok); font-weight: 600; }
@@ -176,3 +176,11 @@ nav { align-items: flex-end; }
 .nav-group { display: flex; align-items: flex-end; flex: none; gap: 2px; }
 .nav-group + .nav-group { margin-left: 10px; padding-left: 12px; border-left: 1px solid var(--bar-line); }
 .nav-label { align-self: center; margin-right: 4px; font-size: 11.5px; font-weight: 600; color: color-mix(in srgb, var(--bar-muted) 75%, transparent); }
+
+/* Pull requests: how to read Score and Effort */
+.legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 12px; margin: 0 0 16px; max-width: 900px; }
+.legend-block { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.legend-block p { margin: 2px 0 8px; }
+.legend-block dl { display: grid; grid-template-columns: 1.6em 1fr; gap: 3px 8px; margin: 0; font-size: 13px; }
+.legend-block dt { font-family: var(--mono); font-weight: 600; color: var(--accent); }
+.legend-block dd { margin: 0; }
