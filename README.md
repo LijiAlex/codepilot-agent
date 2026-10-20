@@ -48,13 +48,20 @@ flowchart LR
 
 ## Quick start
 
-**You need:** Python 3.12, [uv](https://docs.astral.sh/uv/), an Anthropic API key, a [LangSmith](https://smith.langchain.com/) API key for tracing, a [Daytona](https://www.daytona.io/) API key (or `sandbox: local` in `codepilot.yml` for a weaker macOS-only sandbox), and a GitHub App (see [Connect your own repository](#connect-your-own-repository)).
+**Without any keys** (Python 3.12 and [uv](https://docs.astral.sh/uv/) only):
 
 ```bash
 git clone https://github.com/LijiAlex/codepilot-agent && cd codepilot-agent
+uv run pytest                                               # 439 tests
+uv run codepilot selfcheck                                  # every agent has exactly its intended tools
+uv run codepilot replay examples/run-issue-25/events.jsonl  # the recorded run of issue #25 from the demo, step by step
+```
+
+**To run it live, you need:** Python 3.12, [uv](https://docs.astral.sh/uv/), an Anthropic API key, a [LangSmith](https://smith.langchain.com/) API key for tracing, a [Daytona](https://www.daytona.io/) API key (or `sandbox: local` in `codepilot.yml` for a weaker macOS-only sandbox), and a GitHub App (see [Connect your own repository](#connect-your-own-repository)).
+
+```bash
 cp .env.example .env                    # fill in your keys
 cp codepilot.example.yml codepilot.yml  # then delete the two example entries under repos:
-scripts/with-env codepilot selfcheck    # every agent has exactly its intended tools
 ```
 
 `scripts/with-env` loads `.env` into the command's environment; CodePilot+ itself never reads the file. The first run installs large dependencies (ChromaDB, NeMo Guardrails) and can take a few minutes.
