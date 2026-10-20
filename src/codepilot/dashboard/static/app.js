@@ -104,6 +104,12 @@ function resultWord(r) { return RESULTS[r || ""] || (/^\d+$/.test(r) ? "exit cod
 function cardLink(label, value, page) { const c = el(page ? "a" : "div", null, "card"); if (page) c.href = "#" + page; c.appendChild(el("b", value)); c.appendChild(el("span", label, "muted")); return c; }
 function filterInput(placeholder, onChange) { const i = el("input", null, "filter"); i.type = "search"; i.placeholder = placeholder; i.addEventListener("input", () => onChange(i.value.trim().toLowerCase())); return i; }
 const RUBRIC = [["correctness", "C"], ["tests", "T"], ["matches the issue", "M"], ["risk", "R"], ["scope", "S"]];
+function scoreText(f) {                // "6/10 (capped: tests not run · rubric 10)" — a cap is never hidden behind a hover
+  if (!f.cap) return f.score + "/10";
+  const sum = Object.values(f.rubric || {}).reduce((a, b) => a + b, 0);
+  const why = String(f.cap).replace(/^capped at \d+:\s*/, "");
+  return f.score + "/10 (capped: " + why + (Object.keys(f.rubric || {}).length ? " · rubric " + sum : "") + ")";
+}
 function rubricCell(f) {                // "C2 T1 M2 R2 S1"; the reviewer's reason for each on hover
   const r = f.rubric || {}, why = f.rubric_reasons || {};
   if (!Object.keys(r).length) return el("td", "—", "muted");
@@ -274,6 +280,9 @@ const render = {
   },
   async prs(m) {
     const d = await api("prs");
+    m.appendChild(el("p", "Rubric: C correctness · T tests · M matches the issue · R risk · S scope, 0–2 each. They add up to the score "
+      + "unless a cap applies (security concerns cap it at 4; tests not run or failing cap it at 6). Effort is how much work the "
+      + "change is to review (1–5), from its size.", "muted small"));
     for (const [repo, prsIn] of Object.entries(d)) {
       m.appendChild(el("h2", repo));
       if (prsIn.error) { m.appendChild(el("p", "Could not load: " + prsIn.error, "muted")); continue; }
@@ -299,7 +308,7 @@ const render = {
         const rev = el("td");
         if (p.review) { rev.appendChild(details(p.review.current ? "full review" : "full review (older commit)", p.review.body)); } else rev.appendChild(el("span", "not reviewed yet", "muted"));
         return [att, td(link("#" + p.number + " " + p.title, p.url)), p.run_id ? td(runLink(p.run_id)) : el("td", "not from CodePilot+", "muted"),
-          f.score === null || f.score === undefined ? "" : tdTitle(f.score + "/10" + (f.cap ? " (capped)" : ""), f.cap), rubricCell(f),
+          f.score === null || f.score === undefined ? "" : tdTitle(scoreText(f), f.cap), rubricCell(f),
           f.effort === null || f.effort === undefined ? "" : f.effort + "/5", ready, f.matches || "",
           (f.security || []).length ? el("td", f.security.join("; "), "failed") : "none",
           u.count ? num(u.count) : "—", u.count ? "$" + Number(u.cost || 0).toFixed(3) : "—", actions, rev, p.labels.join(", "),
