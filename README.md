@@ -95,6 +95,8 @@ Open two terminals:
 
 (Or run both in one process: `scripts/with-env codepilot --dashboard 8765`.)
 
+Starting the terminal UI begins polling every repository in `codepilot.yml` straight away. Each open `ai-assignable` issue starts a run that uses your API credit; nothing reaches GitHub until you approve it.
+
 ### In the terminal UI
 
 Wait for the next poll (shown in the issues panel title) or press `i` to type a task. To decide on an item, press `Tab` until the Human Approval panel is highlighted, pick it with the arrow keys, press `v` to inspect the diff, tests and PR text, then `a` to approve or `r` to reject. Other keys: `s` skip an issue, `l` full log, `q` quit.
