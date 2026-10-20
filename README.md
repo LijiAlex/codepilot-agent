@@ -112,16 +112,22 @@ The final evaluation (20 October 2026) covered 30 runs on 15 issues across the t
 
 Every line was set before the results existed. This run is also recorded as a baseline in [`results/eval_baseline.json`](results/eval_baseline.json): a later run fails if a model-scored signal drops more than 5 points below it. Two grading changes were made after a run had been seen, and the report lists both under *Changes after the first run*. Counting only each test issue's original expected outcome, 9 of 14 reached it (64%).
 
-The evaluation combines:
+How each part of the evaluation works:
 
-| Part | What it checks | Uses an AI model? |
-|---|---|---|
-| Rule checks | 13 checks on every run: branch name, commit format, pull request description and labels, tests passed after the last change, files touched, no secrets in the diff, no refused command tried again, right skill loaded, repo map within budget | no |
-| Test issues with known outcomes | 14 issues written in advance, each with the outcome CodePilot+ should reach — a pull request, a plan, a question for you, or a refusal | no |
-| Hidden tests | For each pull request, a test the agents never saw is added to its code afterwards and must pass | no |
-| AI judge | The independent reviewer's score on CodePilot+'s pull requests | yes |
-| Judge self-test | Four fixed pull requests the judge must get right: three bad ones (a test deleted to make the suite pass, a change unrelated to the issue, a hard-coded key) and one good one | yes |
-| Injection screen | 27 labelled issue texts, 12 of them attacks | yes |
+| Evaluation | Kind | Online or offline | When and where it runs | How it scores | Deterministic? |
+|---|---|---|---|---|---|
+| Rule checks (13 per run: branch name, commit format, PR body and labels, tests passed after the last change, files touched, no secrets in the diff, no refused command retried, right skill, repo map within budget, triage type) | heuristic | offline | `scripts/evaluate.py`, on your machine, over the recorded runs | pass, fail or n/a per check; n/a never counts as a pass | yes |
+| Test issues with known outcomes (14) | golden set | offline scoring of live runs | as above | did each issue end as expected: a PR, a plan, a question for you, a block or a refusal | scoring yes (the runs are AI) |
+| Triage accuracy | golden set (classification) | offline scoring of live runs | as above | triaged task type against the label set in advance | scoring yes |
+| Hidden tests | execution-based (fail-to-pass) | offline | as above, in a separate Python environment against each PR's code | a test the agents never saw must pass | yes |
+| Independent reviewer | LLM as judge | **online** | GitHub Action on every PR open, new commit or review label (OpenAI model) | 5 criteria × 0–2 = /10; code caps it and decides merge-ready | no (score); caps yes |
+| Judge self-test (4 probes: a deleted test, an unrelated change, a hard-coded key, one good fix) | judge meta-evaluation | offline | `scripts/evaluate.py`, calling the same reviewer | each probe must land on the right side of the merge line | no (the AI under test) |
+| Injection screen (27 labelled texts, 12 attacks) | classifier evaluation | offline | `scripts/measure_guardrail.py` on your machine | catch rate, false-alarm rate, speed | regex yes, Haiku no |
+| Regression floor | baseline comparison | offline | every evaluation after the baseline was recorded | model-scored signals may not drop more than 5 points | yes |
+| Trace analysis and skill gap report | run diagnostics | **online** | after every run, on your machine | failed and refused commands, files read; one proposed skill change | analysis yes, report no |
+| Cost, tokens and time | monitoring | **online** | every model call, LangSmith | measured, shown on the dashboard, not part of the verdict | yes |
+
+*Offline scoring of live runs* means two different moments. The test issues were filed as real GitHub issues and CodePilot+ handled them exactly like any other issue (poller, screening, sandbox, a person's approval, a real pull request). The evaluation reads what those runs left behind afterwards and marks them; no agent runs during it. So the score reflects the real system end to end, and re-running the evaluation re-marks the same runs: fresh outcomes need the issues run again.
 
 Injection screen on the 27 labelled issues — the harmless ones are deliberately code-heavy (stack traces, shell snippets, words like "ignore" and "delete"), because those are the likely false alarms:
 
@@ -204,6 +210,7 @@ Run the tests: `uv run pytest` (435 tests).
 - **A dedicated secret scanner** (for example gitleaks or detect-secrets) instead of the handful of patterns CodePilot+ checks for today.
 - **Static analysis in the reviewer** (for example Semgrep or Bandit): fixed-rule security findings that would feed the same score cap as the AI reviewer's concerns.
 - **A filter on what goes out:** NeMo output rails or Bedrock's sensitive-information filter on pull request text, to catch personal data an agent copies into a public PR.
+- **Evaluation on standard tooling:** keep the golden set and probes as LangSmith datasets and run each evaluation as an experiment, for version-by-version comparison (already tracing there); calibrate the judge against people's labels on a sample of PRs instead of four probes; red-team the injection screen with promptfoo or garak (hundreds of generated attacks instead of 12); and run each test issue several times to report pass@k with error bars, since one run can be lucky or unlucky.
 
 ## For reviewers: the assignment brief
 
