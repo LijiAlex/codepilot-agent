@@ -517,10 +517,12 @@ function logRows(events) {              // a sub-agent's final message comes bac
   return out;
 }
 
+let shown = 0;                          // bumped on every navigation: a page that finishes loading after the user moved on is dropped
 async function showRun(id) {
+  const me = ++shown;
   setActive(""); const m = document.getElementById("main"); loading(m);
   try {
-    const d = await api("runs/" + encodeURIComponent(id)); clear(m);
+    const d = await api("runs/" + encodeURIComponent(id)); if (me !== shown) return; clear(m);
     const back = el("a", "← Back to runs", "back"); back.href = "#runs"; m.appendChild(back);
     m.appendChild(el("h2", d.run.repo + " " + d.run.issue_key + " — " + d.run.title));
     if (d.run.pr_url) { const p = el("p"); p.appendChild(link("Pull request: " + d.run.pr_url, d.run.pr_url)); m.appendChild(p); }
@@ -538,19 +540,20 @@ async function showRun(id) {
     if (d.trace_analysis) m.appendChild(details("Trace analysis (state when the run ended)", JSON.stringify(d.trace_analysis, null, 2)));
     m.appendChild(el("h3", "Agent log"));
     m.appendChild(table(["Time", "Agent", "Kind", "Text"], logRows(d.events).map(e => [e.ts ? new Date(e.ts * 1000).toLocaleTimeString() : "", e.agent, words(e.kind), e.text])));
-  } catch (e) { clear(m); m.appendChild(el("p", "Could not load the run: " + e.message)); }
+  } catch (e) { if (me !== shown) return; clear(m); m.appendChild(el("p", "Could not load the run: " + e.message)); }
 }
 
 async function show(page) {
   if (location.hash !== "#" + page) { location.hash = page; return; }          // hashchange renders it (Back button works)
+  const me = ++shown;
   setActive(page);
   const m = document.getElementById("main"); clear(m);
   const info = PAGES.find(p => p[0] === page);
   m.appendChild(el("p", info[2], "page-intro"));
   const wait = el("p", "Loading…", "muted loading"); m.appendChild(wait);
   const holder = el("div");
-  try { await render[page](holder); wait.remove(); m.appendChild(holder); }
-  catch (e) { wait.remove(); m.appendChild(el("p", "Could not load: " + e.message)); }
+  try { await render[page](holder); if (me !== shown) return; wait.remove(); m.appendChild(holder); }
+  catch (e) { if (me !== shown) return; wait.remove(); m.appendChild(el("p", "Could not load: " + e.message)); }
 }
 
 const ALIASES = { matrix: "runs" };      // old links (#matrix) still open the Runs page
