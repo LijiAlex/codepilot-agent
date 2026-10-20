@@ -20,8 +20,6 @@ from codepilot.safety.sanitize import sanitize_untrusted
 from codepilot.states import RunState
 
 COMPARE_FILE_CAP = 300
-PREFIX = {"bug_fix": "fix", "feature_addition": "feat", "documentation": "docs", "dependency_update": "build",
-          "config_change": "chore"}
 PUBLISH_TOOLS = {"create_branch", "create_commit", "create_pull_request"}
 
 PUBLISH_PROMPT = """You are the PR Agent. A person approved this change. Open the pull request with your three tools, in

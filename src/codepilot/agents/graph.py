@@ -228,6 +228,7 @@ def build_graph(ctx: RunContext, models: dict[str, Any], checkpointer=None):
     }
     orch_perms = [*base_perms, FilesystemPermission(operations=["write"], paths=[f"{SANDBOX_ROUTE}**", "/shared/**"], mode="deny")]
     orch_tools = [show_diff] + ([ctx.issue_tool] if ctx.issue_tool is not None else [_free_form_issue_tool(ctx)])
+    # create_deep_agent adds SummarizationMiddleware to this agent and its subagents by default (brief: summarization=True)
     return create_deep_agent(
         model=models["orchestrator"],
         system_prompt=prompts.ORCHESTRATOR.format(repo=ctx.repo, untrusted=prompts.UNTRUSTED, task_type=ctx.task_type,

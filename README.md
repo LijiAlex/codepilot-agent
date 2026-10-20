@@ -39,7 +39,7 @@ Blue boxes are AI agents or models, green boxes are plain code, and orange boxes
 
 **The agent team.** Built with [DeepAgents](https://github.com/langchain-ai/deepagents) on LangGraph. An Orchestrator plans each task as a checklist and hands work to a Repo Explorer, a Coder, a Test Agent and a PR Agent. Each agent gets only the tools it needs; the list is checked every time the app starts.
 
-**Context that fits.** A real repository does not fit in a model's context window. CodePilot+ builds a *repo map* — the folder tree plus a one-line summary and the main functions of each file — ranked by relevance and cut to a 4,000-token budget. Agents read files only when they need them. On Django (7,084 files) the map is 3,978 tokens.
+**Context that fits.** A real repository does not fit in a model's context window. CodePilot+ builds a *repo map* — the folder tree plus a one-line summary and the main functions of each file — ranked by relevance and cut to a 4,000-token budget. Agents read files only when they need them. On Django (7,084 files) the map is about 3,978 tokens (estimated at four characters per token). Long agent conversations are summarised automatically: DeepAgents adds its summarization middleware to every agent by default.
 
 **Safety.** Several independent layers:
 - Issue text is cleaned (hidden comments, invisible characters) and screened by [NeMo Guardrails](https://github.com/NVIDIA/NeMo-Guardrails); if the screen cannot answer, the issue is held back.
@@ -142,19 +142,21 @@ Run the tests: `uv run pytest` (431 tests).
 - The command check is a filter, not the security boundary: running the project's own tests runs its code by design, so the sandbox is the boundary.
 - Runs are not repeatable: the model does not support a fixed sampling temperature, so the same issue can be handled differently twice.
 - LangSmith keeps traces for 14 days; the screenshot stands in for a link.
+- The reviewer's test job runs the pull request's own code, so a pull request from the same repository could fake its test-result file. Fork pull requests never run code; for same-repository ones, the person who merges is the final check.
+- The command check does not expand shell variables or `~` (for example `echo $X`). The sandbox environment holds no secrets, so this exposes nothing, but it is a gap in the filter.
 
 ## Future improvements
 
 - **Share lessons across repositories.** When the same lesson has been approved for two or more repositories, propose it for the general playbook — additions only, with their own approval.
 - **Steadier triage.** Remember an issue's first classification, or classify twice and take the majority, so retries are consistent.
 - **Block outbound network in the sandbox** with a paid sandbox tier or an allow-list.
-- **Spending limits in dollars** per run and per day (runs are already bounded by model calls, tool calls and time).
+- **Spending limits in dollars** per run and per day (today each agent call is capped in model calls and tool calls, and each run has a 30-minute limit).
 - **An autonomous mode.** Open pull requests without waiting for approval and let the independent reviewer and the merge button be the human checkpoint. The trade-off: agent-written code and text would appear on GitHub before anyone has read it, and a bad run would open pull requests someone has to close. (The assignment requires approval before opening a pull request to `main`, so this version always asks.)
 - **Run tests for fork pull requests** in a separate sandbox with no secrets, so the reviewer can score them fully.
 
 ## For reviewers: the assignment brief
 
-CodePilot+ was built for the AI Engineering Bootcamp capstone brief *Multi-Agent Coding Platform (CodePilot)*. Every requirement is implemented; the table lists where the implementation deliberately differs and why.
+CodePilot+ was built for the AI Engineering Bootcamp capstone brief *Multi-Agent Coding Platform (CodePilot)*. Every requirement is addressed; the table lists where the implementation deliberately differs and why.
 
 | The brief asks for | CodePilot+ does | Why |
 |---|---|---|
