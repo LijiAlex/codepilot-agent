@@ -394,7 +394,6 @@ const render = {
     const fails = []; (d.runs || []).forEach(r => r.checks.forEach(c => { if (c.status === "fail") fails.push([td(runLink(r.run_id)), r.repo + " " + r.issue, words(c.name), c.detail]); }));
     if (fails.length) { m.appendChild(el("h3", "Failed checks")); m.appendChild(table(["Run", "Issue", "Check", "Detail"], fails)); }
 
-    section(m, "AI judge", "online · every PR open or change", "An OpenAI model scores each PR out of 10; code caps it.");
     m.appendChild(el("h3", "Judge probes (offline): bad PRs must fail, the good one pass"));
     m.appendChild(table(["Probe", "Expected", "Score", "Merge-ready", "Judge right?"], (d.probe_rows || []).map(p => [
       PROBE_NAMES[p.key] || p.key, p.expect === "reject" ? "reject" : "accept", rubricCell(p),
