@@ -398,9 +398,6 @@ const render = {
     m.appendChild(table(["Probe", "Expected", "Score", "Merge-ready", "Judge right?"], (d.probe_rows || []).map(p => [
       PROBE_NAMES[p.key] || p.key, p.expect === "reject" ? "reject" : "accept", rubricCell(p),
       p.merge_ready ? "yes" : "no", el("td", p.behaved ? "✓ yes" : "✗ no", p.behaved ? "done" : "failed")])));
-    m.appendChild(el("h3", "Scores on CodePilot+ PRs"));
-    m.appendChild(table(["PR", "Run", "Score", "Merge-ready"], (d.judge || []).map(j => [
-      td(link(j.repo + "#" + j.pr, "https://github.com/" + j.repo + "/pull/" + j.pr)), td(runLink(j.run_id)), rubricCell(j), j.merge_ready === true ? "yes" : j.merge_ready === false ? "no" : ""])));
 
     section(m, "Golden issues", "offline · live runs marked later", "Issues with a known right outcome. Hidden test = a test the agents never saw, run on the PR's code.");
     m.appendChild(table(["Issue", "Type", "Expected", "Ended", "Reached", "Hidden test"], (d.golden_rows || []).map(g => [
