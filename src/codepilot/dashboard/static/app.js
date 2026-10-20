@@ -18,17 +18,14 @@ const GROUPS = [["", ["overview"]], ["Work", ["runs", "prs"]], ["Trust", ["evalu
 const SIGNAL_NAMES = { heuristics_pass_rate: "Rule checks passed", expected_outcome_rate: "Golden issues: expected outcome",
   triage_accuracy: "Triage accuracy", hidden_tests_passed: "Hidden tests passed", judge_mean: "Judge score (mean)",
   judge_probes: "Judge probes right", injection_blocked: "Attacks blocked", false_alarms: "False alarms" };
-const SIGNAL_DESC = { heuristics_pass_rate: "Fixed rules applied to every run: branch, commit, PR text, tests after the last edit, no secrets",
-  expected_outcome_rate: "Test issues with a known right answer that ended the way they should",
-  triage_accuracy: "Runs where triage picked the task type set in advance",
-  hidden_tests_passed: "PRs that pass a test the agents never saw",
-  judge_mean: "The independent AI reviewer's average score on CodePilot+'s PRs",
-  judge_probes: "Known-answer PRs the judge scored on the right side of the merge line",
-  injection_blocked: "Labelled attack issues the injection screen stopped",
-  false_alarms: "Harmless, code-heavy issues the screen wrongly blocked (lower is better)" };
+const SIGNAL_DESC = { heuristics_pass_rate: "Fixed rules on every run", expected_outcome_rate: "Known-answer issues ended right",
+  triage_accuracy: "Right task type picked", hidden_tests_passed: "PRs pass an unseen test",
+  judge_mean: "AI reviewer's average PR score", judge_probes: "Judge right on known-answer PRs",
+  injection_blocked: "Attacks stopped by the screen", false_alarms: "Harmless issues wrongly blocked" };
+const SIGNAL_WHEN = { judge_mean: "online · every PR" };      // the rest are scored offline by scripts/evaluate.py
 function section(m, title, tag, desc) {   // a heading, a small "how it runs" tag and one line saying what the section shows
   const h = el("h2", title); h.appendChild(el("span", tag, "eval-tag")); m.appendChild(h);
-  m.appendChild(el("p", desc, "muted"));
+  if (desc) m.appendChild(el("p", desc, "muted"));
 }
 const PROBE_NAMES = { "deleted-test": "Deletes the failing test", "off-topic": "Change unrelated to the issue",
   "hardcoded-secret": "Hard-coded key", "correct-fix": "Correct fix (control)" };
@@ -371,14 +368,14 @@ const render = {
     v.appendChild(el("span", d.failed.length ? "Below their line: " + d.failed.map(n => SIGNAL_NAMES[n] || n).join(", ") : "Every signal that could run cleared its line."));
     v.appendChild(el("span", "Measured " + when(d.measured_at), "muted small"));
     m.appendChild(v);
-    m.appendChild(el("p", "How to read this page: the verdict is built from the eight signals below. Each section after them shows the detail behind one or more signals. Agent runs happened live; this page marks what they left behind.", "muted"));
-    section(m, "Signals behind the verdict", "the verdict", "Each block: what it measures, today's value, the line it must clear (set in advance), and how many cases it covers.");
+    section(m, "Signals", "", "The verdict is built from these eight. Lines were set in advance.");
     const grid = el("div", null, "sigs");
     d.signals.forEach(s => {
       const t = el("div", null, "sig " + (s.status === "pass" ? "pass" : s.status === "FAIL" ? "fail" : "na"));
       t.title = s.meaning;
       t.appendChild(el("span", SIGNAL_NAMES[s.name] || s.name, "sig-name"));
       if (SIGNAL_DESC[s.name]) t.appendChild(el("span", SIGNAL_DESC[s.name], "small sig-desc"));
+      t.appendChild(el("span", SIGNAL_WHEN[s.name] || "offline", "eval-tag sig-tag"));
       t.appendChild(el("b", s.value === null ? "—" : s.name === "judge_mean" ? (s.value * 10).toFixed(1) + "/10" : pct(s.value)));
       const line = s.line === null || s.line === undefined ? "" : (s.direction === "min" ? "must be ≥ " : "must be ≤ ") +
         (s.name === "judge_mean" ? (s.line * 10).toFixed(1) + "/10" : pct(s.line));
@@ -389,33 +386,31 @@ const render = {
       grid.appendChild(t);
     });
     m.appendChild(grid);
-    m.appendChild(el("p", "Unavailable signals never fail the verdict: a metric that could not look did not find anything wrong. The regression floor (the recorded baseline less 5 points) applies to later evaluations.", "muted small"));
+    m.appendChild(el("p", "Unavailable signals never fail the verdict. Regression floor = baseline − 5 points, for later runs.", "muted small"));
     if ((d.notes || []).length) {
-      section(m, "Changes after the first run", "disclosure", "Grading changes made after a run had been seen, listed here so nobody has to find them in the history.");
+      section(m, "Changes after the first run", "disclosure", "");
       const ul = el("ul"); d.notes.forEach(n => ul.appendChild(el("li", n.replace(/`/g, ""))));
       const o = d.outcome_as_labelled || {};
-      if (o.ended) ul.appendChild(el("li", "Counting only each issue's original expected outcome, " + o.met + " of " + o.ended + " test issues reached it (" + Math.round(o.met / o.ended * 100) + "%)."));
+      if (o.ended) ul.appendChild(el("li", "Without those, " + o.met + " of " + o.ended + " reached their original expected outcome (" + Math.round(o.met / o.ended * 100) + "%)."));
       m.appendChild(ul);
     }
 
-    section(m, "Rule checks", "fixed rules · no AI · offline", "13 checks applied to every recorded run after it ends. Feeds the signal: Rule checks passed.");
-    m.appendChild(el("p", "n/a means there was nothing to inspect — for example, PR checks on a run that opened no PR. It is counted apart, never as a pass.", "muted"));
+    section(m, "Rule checks", "offline · fixed rules", "13 checks per run. n/a = nothing to inspect, never counted as a pass.");
     m.appendChild(table(["Check", "What it checks", "Pass", "Fail", "n/a"], Object.entries(d.checks).map(([k, c]) =>
       [words(k), (d.meaning || {})[k] || "", num(c.pass), c.fail ? el("td", num(c.fail), "failed") : "0", num(c["n/a"])])));
     const fails = []; (d.runs || []).forEach(r => r.checks.forEach(c => { if (c.status === "fail") fails.push([td(runLink(r.run_id)), r.repo + " " + r.issue, words(c.name), c.detail]); }));
     if (fails.length) { m.appendChild(el("h3", "Failed checks")); m.appendChild(table(["Run", "Issue", "Check", "Detail"], fails)); }
 
-    section(m, "AI judge: the independent reviewer", "AI · online on every PR", "An OpenAI model scores every pull request out of 10 when it opens or changes. Feeds the signals: Judge score and Judge probes right.");
-    m.appendChild(el("p", "The agents write code on Claude; the reviewer grades on an OpenAI model, so the system never grades its own work. Probes are fixed pull requests that never come from CodePilot+: the three bad ones must score below the merge line, the correct fix above it.", "muted"));
-    m.appendChild(el("h3", "Judge probes: can the judge tell bad work from good?"));
+    section(m, "AI judge", "online · every PR open or change", "An OpenAI model scores each PR out of 10; code caps it.");
+    m.appendChild(el("h3", "Judge probes (offline): bad PRs must fail, the good one pass"));
     m.appendChild(table(["Probe", "Expected", "Score", "Merge-ready", "Judge right?"], (d.probe_rows || []).map(p => [
       PROBE_NAMES[p.key] || p.key, p.expect === "reject" ? "reject" : "accept", rubricCell(p),
       p.merge_ready ? "yes" : "no", el("td", p.behaved ? "✓ yes" : "✗ no", p.behaved ? "done" : "failed")])));
-    m.appendChild(el("h3", "Scores on CodePilot+ pull requests (averaged into Judge score)"));
+    m.appendChild(el("h3", "Scores on CodePilot+ PRs"));
     m.appendChild(table(["PR", "Run", "Score", "Merge-ready"], (d.judge || []).map(j => [
       td(link(j.repo + "#" + j.pr, "https://github.com/" + j.repo + "/pull/" + j.pr)), td(runLink(j.run_id)), rubricCell(j), j.merge_ready === true ? "yes" : j.merge_ready === false ? "no" : ""])));
 
-    section(m, "Golden issues: known right answers", "fixed rules · live runs, marked offline", "Issues filed on the playground with the outcome CodePilot+ should reach. A PR's hidden test is never shown to the agents; it is added to the PR's code afterwards and must pass. Feeds the signals: expected outcome, triage accuracy and hidden tests.");
+    section(m, "Golden issues", "offline · live runs marked later", "Issues with a known right outcome. Hidden test = a test the agents never saw, run on the PR's code.");
     m.appendChild(table(["Issue", "Type", "Expected", "Ended", "Reached", "Hidden test"], (d.golden_rows || []).map(g => [
       g.key + (g.issue ? " (#" + g.issue + ")" : " (not filed)"), words(g.type), words(g.expect), g.ended ? "yes" : el("td", "not yet", "muted"),
       !g.ended ? el("td", "–", "muted") : el("td", g.met ? "✓ yes" + (g.met_as && g.met_as !== g.expect ? " (" + words(g.met_as) + ")" : "") : "✗ no", g.met ? "done" : "failed"),
