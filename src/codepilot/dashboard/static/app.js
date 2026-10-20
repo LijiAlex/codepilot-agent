@@ -125,6 +125,17 @@ function legend() {                      // how to read the Score and Effort col
     [["1", "one file, up to 20 lines"], ["2", "two files, or over 20 lines"], ["3", "three or more files, or over 80 lines"],
      ["4", "over 250 lines"], ["5", "over 600 lines, or anything under .github/"]],
     "Packaging or lock files (pyproject.toml, requirements, *.lock) make it at least 3."));
+  const cols = box.appendChild(block("The columns", "Every open pull request, by CodePilot+ or by a person, with the independent reviewer's verdict.",
+    [["⚠", "Why a person should look now: from a fork, not reviewed yet, review is for an older commit, security concerns, low score or tests not run"],
+     ["PR", "The pull request on GitHub"], ["Run", "The CodePilot+ run that opened it, or “not from CodePilot+”"],
+     ["Score", "The reviewer's 0–10 with the five-part breakdown (see Score)"], ["Effort", "How much work it is to review (see Effort)"],
+     ["Merge-ready", "yes only when the score is at least 8, the tests passed and no protected file is touched; otherwise why not"],
+     ["Matches the issue", "The reviewer's one-line verdict: does it do what the linked issue asks, no more, no less?"],
+     ["Security", "Security problems the reviewer found in the diff, or none. Any concern caps the score at 4 and blocks Merge"],
+     ["Reviews · Review cost", "How many times the reviewer has scored it, and what those model calls cost"],
+     ["Actions", "Merge (only when merge-ready, asks first) or Close"], ["Review", "The reviewer's full comment"],
+     ["Labels · Author", "GitHub labels, and who opened it (“fork” = from another account's copy; its code is never run)"]]));
+  cols.classList.add("cols");
   return box;
 }
 function rubricCell(f, why = {}) {      // one Score column: "9/10" (or why it was capped), "C2 T1 M2 R2 S2" under it, reasons on hover

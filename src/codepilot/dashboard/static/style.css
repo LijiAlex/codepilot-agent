@@ -185,3 +185,6 @@ nav { align-items: flex-end; }
 .legend-block dl { display: grid; grid-template-columns: 1.6em 1fr; gap: 3px 8px; margin: 0; font-size: 13px; }
 .legend-block dt { font-family: var(--mono); font-weight: 600; color: var(--accent); }
 .legend-block dd { margin: 0; }
+.legend-block.cols { grid-column: 1 / -1; }
+.legend-block.cols dl { grid-template-columns: max-content 1fr; }
+.legend-block.cols dt { font-family: inherit; }
