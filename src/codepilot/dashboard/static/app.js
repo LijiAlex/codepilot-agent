@@ -3,7 +3,7 @@
 const PAGES = [
   ["overview", "Overview", "Totals across every run CodePilot+ has done."],
   ["runs", "Runs", "Every run and the stages it reached. Click a run ID for its diff, log and analysis."],
-  ["prs", "Pull requests", "Open pull requests with the independent review. Merge needs a current review that says merge-ready."],
+  ["prs", "Pull requests", "Open pull requests with the independent review. Merge needs a current review that says merge-ready. What each column means is at the bottom of the page."],
   ["evaluation", "Evaluation", "One verdict from rule checks on every run, the independent reviewer as judge (tested with probes), golden issues with hidden tests, and the injection screen."],
   ["safety", "Safety", "What the guardrails refused or held back, and the measured injection screen."],
   ["audit", "Audit log", "Every action, by whom, in order."],
@@ -106,7 +106,7 @@ function filterInput(placeholder, onChange) { const i = el("input", null, "filte
 const EFFORT_HELP = "1 = one file, up to 20 lines\n2 = two files or over 20 lines\n3 = three or more files, or over 80 lines\n"
   + "4 = over 250 lines\n5 = over 600 lines, or anything under .github/\nPackaging or lock files (pyproject.toml, requirements, *.lock) make it at least 3";
 const RUBRIC = [["correctness", "C"], ["tests", "T"], ["matches the issue", "M"], ["risk", "R"], ["scope", "S"]];
-function legend() {                      // how to read the Score and Effort columns, as two small blocks
+function legend() {                      // how to read the PR columns, Score and Effort: shown under the tables
   const box = el("div", null, "legend");
   const block = (title, intro, rows, foot) => {
     const b = el("div", null, "legend-block");
@@ -315,7 +315,6 @@ const render = {
   },
   async prs(m) {
     const d = await api("prs");
-    m.appendChild(legend());
     for (const [repo, prsIn] of Object.entries(d)) {
       m.appendChild(el("h2", repo));
       if (prsIn.error) { m.appendChild(el("p", "Could not load: " + prsIn.error, "muted")); continue; }
@@ -349,6 +348,8 @@ const render = {
           p.author + (p.from_fork ? " (fork)" : "")];
       })));
     }
+    m.appendChild(el("h2", "How to read this page"));
+    m.appendChild(legend());
   },
   async evaluation(m) {
     const d = await api("eval");
