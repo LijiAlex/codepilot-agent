@@ -54,6 +54,34 @@ Blue boxes are AI agents or models, green boxes are plain code, and orange boxes
 - Agents can only write inside the sandbox, and never to secret files.
 - Your approval is required to open a pull request, for any change touching more than 5 files, and before a third attempt after tests fail twice.
 
+**Safety at a glance.** Every guard, the stage it acts at, and whether it is a fixed rule, an AI judgement or a person. AI is used only where judgement is needed, and each AI check is backed by a fixed rule or a person.
+
+| What is guarded | Stage | How | AI or fixed rule |
+|---|---|---|---|
+| Who can assign work (issue author allowlist) | input | code | fixed rule |
+| Hidden instructions in issue text, comments, changelogs and lessons | input | code: strip hidden content, wrap as untrusted | fixed rule |
+| Obvious prompt injection | input | NeMo Guardrails regex rail | fixed rule |
+| Subtler prompt injection | input | NeMo Guardrails self-check rail (Claude Haiku); the issue waits if the check cannot run | **AI** |
+| *(alternative)* prompt injection | input | AWS Bedrock Guardrail from the earlier project, off by default (`injection_checker: bedrock`) | **AI** |
+| Shell commands | execution | code: allow, refuse with a reason, or ask a person | fixed rule |
+| Which tools each agent may call | execution | code: per-agent allowlist, checked at startup and on every call | fixed rule |
+| Secret files (`.env`, keys, credentials, dot-folders) | execution | code: refused and hidden from listings | fixed rule |
+| Where agents may write | execution | DeepAgents filesystem permissions | fixed rule |
+| The machine and GitHub | execution | Daytona sandbox with no token and no remote | fixed rule |
+| Runaway runs | execution | code: model and tool call caps, 30-minute limit, loop detector | fixed rule |
+| "Tests pass" claims | before approval | code: `run_tests` must pass after the last edit; shell test runs do not count | fixed rule |
+| The change itself | before approval | code: empty change, protected paths, weakened tests, more than 5 files, new dependencies | fixed rule |
+| Risky steps | before publishing | a person approves in the terminal | **person** |
+| What gets published | output | code: re-check the issue and base branch; tools publish exactly what was approved | fixed rule |
+| Pull request quality | output | independent reviewer (OpenAI) scores it | **AI** |
+| Score caps and merge-ready | output | code: security concerns cap at 4, untested at 6; merge-ready needs 8+ and passing tests | fixed rule |
+| Merging | output | dashboard merge gate plus a person's click | fixed rule + **person** |
+| Secrets leaving the machine | output | code: key and token redaction in traces, the audit log and errors | fixed rule |
+| The dashboard | output | code: localhost only, token, host and origin checks, text-only rendering | fixed rule |
+| Accountability | everywhere | append-only audit log | fixed rule |
+
+Command, file and permission checks are deliberately plain code rather than a guardrail model: a parser and an allowlist cannot be talked round, cost nothing and run on every tool call. Guardrail models are used where the input is natural language, which matches the brief's "Custom Python + NeMo Guardrails".
+
 **Memory.** Three kinds, as people have:
 - *Working memory* — the current task's state, shared between the agents and cleared when the task ends.
 - *Session memory* — a summary of each session, read at start-up so recently failed issues are not retried straight away.
@@ -172,6 +200,10 @@ Run the tests: `uv run pytest` (435 tests).
 - **Spending limits in dollars** per run and per day (today each agent call is capped in model calls and tool calls, and each run has a 30-minute limit).
 - **An autonomous mode.** Open pull requests without waiting for approval and let the independent reviewer and the merge button be the human checkpoint. The trade-off: agent-written code and text would appear on GitHub before anyone has read it, and a bad run would open pull requests someone has to close. (The assignment requires approval before opening a pull request to `main`, so this version always asks.)
 - **Run tests for fork pull requests** in a separate sandbox with no secrets, so the reviewer can score them fully.
+- **Screen what the agents read, not only the issue.** Today only issue text is screened for injected instructions; a README or code comment inside the repository is not. A small local prompt-injection classifier from Hugging Face (for example Llama Prompt Guard 2, 22M parameters) is fast and free enough to run on every file read and tool output, which an LLM check is not. It would be measured on the same 27 labelled issues before use, so false alarms on code-heavy text stay at zero.
+- **A dedicated secret scanner** (for example gitleaks or detect-secrets) instead of the handful of patterns CodePilot+ checks for today.
+- **Static analysis in the reviewer** (for example Semgrep or Bandit): fixed-rule security findings that would feed the same score cap as the AI reviewer's concerns.
+- **A filter on what goes out:** NeMo output rails or Bedrock's sensitive-information filter on pull request text, to catch personal data an agent copies into a public PR.
 
 ## For reviewers: the assignment brief
 
