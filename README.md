@@ -15,7 +15,7 @@ CodePilot+ is a multi-agent coding platform that turns a labelled GitHub issue i
 - The system learns from each run and proposes improvements to its own playbooks, which take effect only when you approve them.
 - A terminal UI shows the work as it happens, and a dashboard records everything afterwards.
 
-**Contents:** [See it in action](#see-it-in-action) · [How it works](#how-it-works) · [Flows](#flows) · [What's included](#whats-included) · [Quick start](#quick-start) · [Using it](#using-it) · [Connect your own repository](#connect-your-own-repository) · [Architecture](#architecture) · [Example pull requests](#example-pull-requests) · [Safety](#safety) · [Results](#results) · [Design choices](#design-choices) · [For reviewers](#for-reviewers-the-assignment-brief) · [Known limitations](#known-limitations)
+**Contents:** [See it in action](#see-it-in-action) · [How it works](#how-it-works) · [What's included](#whats-included) · [Flows](#flows) · [Quick start](#quick-start) · [Using it](#using-it) · [Connect your own repository](#connect-your-own-repository) · [Architecture](#architecture) · [Example pull requests](#example-pull-requests) · [Safety](#safety) · [Results](#results) · [Design choices](#design-choices) · [For reviewers](#for-reviewers-the-assignment-brief) · [Known limitations](#known-limitations)
 
 ## CodePilot+ in a nut shell
 
@@ -37,21 +37,6 @@ https://github.com/user-attachments/assets/014654ff-ab4b-4968-90a4-cfe01fa8bc64
 
 ## How it works
 
-### The flow
-
-```mermaid
-flowchart LR
-  I[GitHub issue<br/>labelled ai-assignable] --> S[Safety screen]
-  S --> T[Triage: what kind of task?]
-  T --> A[Agents explore, code, test<br/>in a sandbox]
-  A --> H{You approve<br/>in the terminal}
-  H -- yes --> PR[Pull request on GitHub]
-  PR --> R[Independent AI review]
-  PR -- merged --> M[Lesson saved to memory]
-```
-
-### Step by step
-
 1. **Watch.** Every 5 minutes CodePilot+ checks your repositories for open issues labelled `ai-assignable` (or you type a task in the terminal).
 2. **Screen.** The issue text is cleaned and checked for prompt injection (instructions hidden in an issue to trick the AI) before any agent reads it.
 3. **Triage.** The issue is sorted into one of five task types (bug fix, feature, dependency update, documentation, configuration) and scored 1–10 for complexity. The type picks the playbook (*skill*) the agents follow. Issues that are too complex get a written plan for you to approve instead of code.
@@ -59,6 +44,20 @@ flowchart LR
 5. **Approve.** The run saves its work and ends; the item waits in the terminal's approval panel until you approve or reject it.
 6. **Publish.** Plain code re-checks the issue and the main branch, commits exactly the approved change and opens one labelled pull request.
 7. **Review and learn.** A different company's AI model scores every pull request. Merged work becomes a lesson, and after every run CodePilot+ proposes one improvement to the repository's playbook for you to approve.
+
+## What's included
+
+| Core requirements | Bonus features | Beyond the brief |
+|---|---|---|
+| Issue polling every 5 minutes | Complexity scoring (1–10) | Prompt-injection screening of every issue |
+| Triage into 5 task types, each with its own skill | Self-healing tests (Test Doctor) | Independent AI review of every pull request, with a merge-ready gate |
+| Multi-agent orchestration: Orchestrator, Repo Explorer, Coder, Test Agent, PR Agent | LangSmith tracing | Self-improvement loop that updates repository-specific skills, with your approval |
+| Token-budgeted repository map | Daytona cloud sandbox | A plan instead of code for complex issues |
+| Sandboxed execution with a command guard | | Dashboard to merge pull requests, approve skill changes and review every run |
+| Human approval gates | | Evaluation suite with a single verdict |
+| Working, session and lesson memory | | One-command repository setup (`connect`) |
+| Four-panel terminal UI | | |
+| Branch, commit and labelled pull request | | |
 
 ## Flows
 
@@ -81,20 +80,6 @@ flowchart LR
 ### Connecting a repository
 
 ![Connecting a repository: check access, create labels, detect setup, build repo map, repo skill v1, code index, codepilot.yml entry](docs/flows/connect.png)
-
-## What's included
-
-| Core requirements | Bonus features | Beyond the brief |
-|---|---|---|
-| Issue polling every 5 minutes | Complexity scoring (1–10) | Prompt-injection screening of every issue |
-| Triage into 5 task types, each with its own skill | Self-healing tests (Test Doctor) | Independent AI review of every pull request, with a merge-ready gate |
-| Multi-agent orchestration: Orchestrator, Repo Explorer, Coder, Test Agent, PR Agent | LangSmith tracing | Self-improvement loop that updates repository-specific skills, with your approval |
-| Token-budgeted repository map | Daytona cloud sandbox | A plan instead of code for complex issues |
-| Sandboxed execution with a command guard | | Dashboard to merge pull requests, approve skill changes and review every run |
-| Human approval gates | | Evaluation suite with a single verdict |
-| Working, session and lesson memory | | One-command repository setup (`connect`) |
-| Four-panel terminal UI | | |
-| Branch, commit and labelled pull request | | |
 
 ## Quick start
 
