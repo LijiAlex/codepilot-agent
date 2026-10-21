@@ -15,7 +15,7 @@ CodePilot+ is a multi-agent coding platform that turns a labelled GitHub issue i
 - The system learns from each run and proposes improvements to its own playbooks, which take effect only when you approve them.
 - A terminal UI shows the work as it happens, and a dashboard records everything afterwards.
 
-**Contents:** [See it in action](#see-it-in-action) · [What's included](#whats-included) · [Flows](#flows) · [Quick start](#quick-start) · [Using it](#using-it) · [Connect your own repository](#connect-your-own-repository) · [Architecture](#architecture) · [Example pull requests](#example-pull-requests) · [Safety](#safety) · [Results](#results) · [Design choices](#design-choices) · [For reviewers](#for-reviewers-the-assignment-brief) · [Known limitations](#known-limitations)
+**Contents:** [See it in action](#see-it-in-action) · [What's included](#whats-included) · [Flows](#flows) · [Quick start](#quick-start) · [Connect your own repository](#connect-your-own-repository) · [Using it](#using-it) · [Architecture](#architecture) · [Example pull requests](#example-pull-requests) · [Safety](#safety) · [Results](#results) · [Design choices](#design-choices) · [For reviewers](#for-reviewers-the-assignment-brief) · [Known limitations](#known-limitations)
 
 ## CodePilot+ in a nut shell
 
@@ -73,15 +73,44 @@ https://github.com/user-attachments/assets/014654ff-ab4b-4968-90a4-cfe01fa8bc64
 
 ## Quick start
 
-You need: Python 3.12, [uv](https://docs.astral.sh/uv/), an Anthropic API key, a [LangSmith](https://smith.langchain.com/) API key for tracing, an OpenAI API key for the independent reviewer, a [Daytona](https://www.daytona.io/) API key (or a local sandbox on macOS, set with `sandbox: local` in `codepilot.yml`; it is covered by tests only and was not used in the live runs), and a GitHub App (see [Connect your own repository](#connect-your-own-repository)).
+You need: Python 3.12, [uv](https://docs.astral.sh/uv/), an Anthropic API key, a [LangSmith](https://smith.langchain.com/) API key for tracing, an OpenAI API key for the independent reviewer, a [Daytona](https://www.daytona.io/) API key (or a local sandbox on macOS, set with `sandbox: local` in `codepilot.yml`; it is covered by tests only and was not used in the live runs), a GitHub repository of your own, and permission to create a GitHub App on it.
 
-```bash
-git clone https://github.com/LijiAlex/codepilot-agent && cd codepilot-agent
-cp .env.example .env                    # fill in your keys
-cp codepilot.example.yml codepilot.yml  # then delete the two example entries under repos:
-```
+1. **Get the code and the config files:**
+   ```bash
+   git clone https://github.com/LijiAlex/codepilot-agent && cd codepilot-agent
+   cp .env.example .env
+   cp codepilot.example.yml codepilot.yml
+   ```
+2. **Fill in your keys** in `.env`.
+3. **Create a GitHub App and install it on your repository** ([how](#create-the-github-app)). Put its App ID and the path to its private key file in `.env`.
+4. **Delete the two example entries** under `repos:` in `codepilot.yml`; they point at the author's repositories.
+5. **Connect your repository:** `scripts/with-env codepilot connect OWNER/REPO --write` ([what it does](#what-connect-does)).
+6. **Limit who can assign work:** in your repository's entry in `codepilot.yml`, add `author_allowlist: [your-github-login]`. Without it, anyone's issue is accepted.
+7. **Add the independent reviewer** to your repository ([how](#add-the-independent-reviewer)).
+8. **Start the terminal UI and the dashboard** ([how](#using-it)), then label an issue `ai-assignable`.
 
 `scripts/with-env` loads `.env` into the command's environment; CodePilot+ itself never reads the file. The first run installs large dependencies (ChromaDB, NeMo Guardrails) and can take a few minutes.
+
+## Connect your own repository
+
+### Create the GitHub App
+
+GitHub → Settings → Developer settings → GitHub Apps → New GitHub App. Give it these repository permissions: *Contents*, *Pull requests* and *Issues*: read & write; *Metadata*: read. Generate a private key (a `.pem` file) and install the App on your repository. In `.env`, set `CODEPILOT_GH_APP_ID` to the App ID and `CODEPILOT_GH_APP_KEY_PATH` to the path of the `.pem` file.
+
+### What connect does
+
+`codepilot connect OWNER/REPO --write` checks that the App can reach the repository, creates the `ai-assignable` and review labels, detects the install and test commands, builds the repo map and the repository's first skill notes, and adds the repository to `codepilot.yml`. Add `--no-index` to skip the embedding model download.
+
+### Add the independent reviewer
+
+It needs a second GitHub App for the reviewer, the OpenAI key, and `gh` with the workflow scope (`gh auth refresh -s workflow`).
+
+```bash
+uv run python scripts/install_reviewer.py --repo OWNER/REPO --install "pip install -e . pytest"           # preview
+uv run python scripts/install_reviewer.py --repo OWNER/REPO --install "pip install -e . pytest" --create  # writes the workflow to main
+```
+
+Then, in the repository's settings, add the secrets `OPENAI_API_KEY` and `REVIEWER_APP_KEY` and the variables `REVIEWER_APP_ID`, `REVIEWER_LOGIN` and `CODEPILOT_LOGIN` (the two logins are `<app-slug>[bot]`). Set `reviewer_login` in `codepilot.yml` to the same reviewer login so the dashboard can gate Merge on its reviews.
 
 ## Using it
 
@@ -107,26 +136,6 @@ Wait for the next poll (shown in the issues panel title) or press `i` to type a 
 A pull request can be merged once the independent reviewer has scored it merge-ready. Proposed skill changes wait on the Improvements tab.
 
 ![Dashboard overview](docs/dashboard.png)
-
-## Connect your own repository
-
-### Set up CodePilot+ on the repository
-
-1. **Create a GitHub App** (GitHub → Settings → Developer settings → GitHub Apps) with repository permissions *Contents*, *Pull requests* and *Issues*: read & write; *Metadata*: read. Generate a private key (`.pem`) and install the App on your repository. In `.env`, set `CODEPILOT_GH_APP_ID` and `CODEPILOT_GH_APP_KEY_PATH` (the path to the `.pem` file).
-2. **Connect it:** `scripts/with-env codepilot connect OWNER/REPO --write`. This checks access, creates the `ai-assignable` and review labels, detects the install and test commands, builds the repo map and the repository's first skill notes, and adds the repository to `codepilot.yml`. Add `--no-index` to skip the embedding model download.
-3. **Limit who can assign work:** in that entry in `codepilot.yml`, add `author_allowlist: [your-github-login]`. Without it, anyone's issue is accepted.
-4. **Label an issue** `ai-assignable` and start the terminal UI.
-
-### Add the independent reviewer
-
-It needs a second GitHub App for the reviewer, the OpenAI key, and `gh` with the workflow scope (`gh auth refresh -s workflow`).
-
-```bash
-uv run python scripts/install_reviewer.py --repo OWNER/REPO --install "pip install -e . pytest"           # preview
-uv run python scripts/install_reviewer.py --repo OWNER/REPO --install "pip install -e . pytest" --create  # writes the workflow to main
-```
-
-Then, in the repository's settings, add the secrets `OPENAI_API_KEY` and `REVIEWER_APP_KEY` and the variables `REVIEWER_APP_ID`, `REVIEWER_LOGIN` and `CODEPILOT_LOGIN` (the two logins are `<app-slug>[bot]`). Set `reviewer_login` in `codepilot.yml` to the same reviewer login so the dashboard can gate Merge on its reviews.
 
 ## Architecture
 

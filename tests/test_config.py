@@ -27,3 +27,9 @@ def test_protected_paths_add_to_defaults(tmp_path: Path):
     cfg.write_text("repos:\n  - owner: o\n    name: r\n    protected_paths: ['.claude-plugin/**']\n")
     paths = load_settings(cfg).repos[0].protected_paths
     assert ".claude-plugin/**" in paths and ".github/**" in paths and "**/.env" in paths
+
+
+def test_empty_repos_list_loads_before_the_first_connect(tmp_path: Path):
+    cfg = tmp_path / "codepilot.yml"
+    cfg.write_text("repos:\nsandbox: daytona\n")
+    assert load_settings(cfg).repos == []

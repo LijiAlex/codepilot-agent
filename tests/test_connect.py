@@ -89,3 +89,17 @@ def test_cli_connect_prints_setup_and_block(tmp_path, monkeypatch, capsys):
     out = capsys.readouterr().out
     assert seen["owner"] == "o" and seen["file_index"] is None and seen["daytona_client"] is None and seen["config_path"] is None
     assert "note: no tests found" in out and "repo skill v1" in out and "- owner: o" in out
+
+
+def test_connect_writes_into_an_emptied_repos_list(tmp_path):
+    origin = mk(tmp_path / "o", {"pyproject.toml": "[project]\nname='x'\n", "a.py": "x = 1\n"})
+    for c in (["init", "-q", "-b", "main"], ["add", "."], ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "i"]):
+        subprocess.run(["git", *c], cwd=origin, check=True)
+    home = tmp_path / "home"
+    subprocess.run(["git", "clone", "-q", str(origin), str(home / "repos" / "o" / "r" / "mirror")], check=True)
+    for i, empty in enumerate(["repos:\n", "repos: []\n"]):       # README: delete the example entries, then connect
+        cfg = tmp_path / f"c{i}.yml"
+        cfg.write_text("poll_interval_s: 300\n" + empty + "sandbox: daytona\n")
+        connect("o", "r", home, repo_factory=lambda n: FakeRepo(), mirror=HostMirror(home),
+                skills=RepoSkillStore(db_connect(tmp_path / f"cp{i}.db")), config_path=cfg)
+        assert [r.full_name for r in load_settings(cfg).repos] == ["o/r"]

@@ -69,4 +69,6 @@ class Settings(BaseModel):
 
 def load_settings(path: Path) -> Settings:
     data = yaml.safe_load(Path(path).read_text()) or {}
+    if data.get("repos") is None:      # `repos:` left empty before the first `connect --write`
+        data["repos"] = []
     return Settings.model_validate(data)

@@ -115,6 +115,7 @@ def connect(owner: str, name: str, home: Path, *, repo_factory, mirror, skills, 
             else:
                 lines = text.splitlines(keepends=True)
                 i = next(n for n, line in enumerate(lines) if line.startswith("repos:"))
+                lines[i] = "repos:\n"                     # `repos: []` would make the inserted entry invalid YAML
                 lines.insert(i + 1, "".join("  " + line + "\n" for line in block.splitlines()))
                 config_path.write_text("".join(lines))
             written = True
