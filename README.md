@@ -15,7 +15,7 @@ CodePilot+ is a multi-agent coding platform that turns a labelled GitHub issue i
 - The system learns from each run and proposes improvements to its own playbooks, which take effect only when you approve them.
 - A terminal UI shows the work as it happens, and a dashboard records everything afterwards.
 
-**Contents:** [See it in action](#see-it-in-action) · [How it works](#how-it-works) · [What's included](#whats-included) · [Quick start](#quick-start) · [Using it](#using-it) · [Connect your own repository](#connect-your-own-repository) · [Architecture](#architecture) · [Example pull requests](#example-pull-requests) · [Safety](#safety) · [Results](#results) · [Design choices](#design-choices) · [For reviewers](#for-reviewers-the-assignment-brief) · [Known limitations](#known-limitations)
+**Contents:** [See it in action](#see-it-in-action) · [How it works](#how-it-works) · [Flows](#flows) · [What's included](#whats-included) · [Quick start](#quick-start) · [Using it](#using-it) · [Connect your own repository](#connect-your-own-repository) · [Architecture](#architecture) · [Example pull requests](#example-pull-requests) · [Safety](#safety) · [Results](#results) · [Design choices](#design-choices) · [For reviewers](#for-reviewers-the-assignment-brief) · [Known limitations](#known-limitations)
 
 ## CodePilot+ in a nut shell
 
@@ -59,6 +59,97 @@ flowchart LR
 5. **Approve.** The run saves its work and ends; the item waits in the terminal's approval panel until you approve or reject it.
 6. **Publish.** Plain code re-checks the issue and the main branch, commits exactly the approved change and opens one labelled pull request.
 7. **Review and learn.** A different company's AI model scores every pull request. Merged work becomes a lesson, and after every run CodePilot+ proposes one improvement to the repository's playbook for you to approve.
+
+## Flows
+
+### Solver
+
+```mermaid
+flowchart LR
+  A["Issue labelled ai-assignable"] --> B["Poller · every 5 min"]
+  T["Task typed in the terminal UI"] --> D
+  B --> C{"Injection screen"}
+  C -- blocked --> X["Skipped and logged"]
+  C -- passed --> D{"Triage · task type + complexity"}
+  D -- too complex --> PL["Plan"]
+  D -- fixable --> E["Context · repo map + skill + lessons"]
+  E --> O
+  subgraph SB["Daytona sandbox · no GitHub credentials · command guard on every call"]
+    O["Orchestrator"] -. "files not named" .-> RE["Repo Explorer"]
+    O --> CO["Coder"]
+    RE --> CO
+    CO --> TA["Test Agent"]
+    TA --> PA["PR Agent · drafts text"]
+  end
+  PA --> W["Run saves and ends"]
+  PL --> W
+  CO -- "over 5 files · unknown command" --> W
+  TA -- "3rd attempt" --> W
+  W --> H{"You decide · terminal UI"}
+  H -- reject --> L["Lesson saved"]
+  H -- approve --> P["Publish · re-check + one commit"]
+  P --> PR["Labelled pull request"]
+```
+
+### PR review
+
+```mermaid
+flowchart LR
+  A["PR opened or updated · CodePilot+, person or fork"] --> GA["GitHub Action"]
+  GA --> T["Job 1 · tests · no secrets"]
+  GA --> R["Job 2 · OpenAI review · 5 criteria × 0–2"]
+  F["Fork PR"] -. "diff only · code never runs" .-> R
+  T --> CAP["Code caps the score · security 4 · untested 6"]
+  R --> CAP
+  CAP --> M{"Score ≥ 8 · tests pass · no protected files"}
+  M -- yes --> MR["Label merge-ready"]
+  M -- no --> NR["Label needs-review"]
+  MR --> D["You merge · dashboard"]
+  NR --> P["A person decides"]
+  D --> W["PR watcher"]
+  W --> LS["Lesson saved"]
+```
+
+### Self-improvement loop
+
+```mermaid
+flowchart LR
+  A["Run ends · any outcome"] --> B["Trace analysis · refused commands, files hard to find"]
+  B --> C["Skill gap report · AI"]
+  C --> D["One proposal · add, correct or retire a step"]
+  D --> E["Confidence rises when runs repeat it"]
+  E --> F{"You decide · dashboard"}
+  F -- approve --> G["Repo skill v+1 · old versions kept"]
+  F -- reject --> X["Recorded, not applied"]
+  G --> H["Next run on this repo uses it"]
+  H -.-> A
+```
+
+### Lessons
+
+```mermaid
+flowchart LR
+  A["PR merged"] --> L1["Lesson · what worked"]
+  B["Run failed or rejected"] --> L2["Lesson · what went wrong"]
+  L1 --> S[("ChromaDB · per repo + task type")]
+  L2 --> S
+  N["New issue"] --> Q["Recall 3 most similar"]
+  S --> Q
+  Q --> O["Orchestrator and agents · marked untrusted"]
+```
+
+### Connecting a repository
+
+```mermaid
+flowchart LR
+  A["codepilot connect OWNER/REPO"] --> B["Check access"]
+  B --> C["Create labels"]
+  C --> D["Detect install + test commands"]
+  D --> E["Build repo map"]
+  E --> F["Repo skill v1"]
+  F --> G["Code index"]
+  G --> H["Entry in codepilot.yml"]
+```
 
 ## What's included
 
