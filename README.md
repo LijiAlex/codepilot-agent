@@ -15,7 +15,7 @@ CodePilot+ is a multi-agent coding platform that turns a labelled GitHub issue i
 - The system learns from each run and proposes improvements to its own playbooks, which take effect only when you approve them.
 - A terminal UI shows the work as it happens, and a dashboard records everything afterwards.
 
-**Contents:** [Demo](#demo) · [How it works](#how-it-works) · [What's included](#whats-included) · [Quick start](#quick-start) · [Using it](#using-it) · [Connect your own repository](#connect-your-own-repository) · [Architecture](#architecture) · [Example pull requests](#example-pull-requests) · [Safety](#safety) · [Results](#results) · [Design choices](#design-choices) · [For reviewers](#for-reviewers-the-assignment-brief) · [Known limitations](#known-limitations)
+**Contents:** [See it in action](#see-it-in-action) · [How it works](#how-it-works) · [What's included](#whats-included) · [Quick start](#quick-start) · [Using it](#using-it) · [Connect your own repository](#connect-your-own-repository) · [Architecture](#architecture) · [Example pull requests](#example-pull-requests) · [Safety](#safety) · [Results](#results) · [Design choices](#design-choices) · [For reviewers](#for-reviewers-the-assignment-brief) · [Known limitations](#known-limitations)
 
 ## CodePilot+ in a nut shell
 
@@ -62,11 +62,17 @@ flowchart LR
 
 ## What's included
 
-| | |
-|---|---|
-| **Brief** (required) | Issue polling every 5 minutes · triage into 5 task types · Orchestrator with Repo Explorer, Coder, Test Agent and PR Agent · repo map within a token budget · one skill per task type · sandboxed execution with a command guard · human approval gates · working, session and lesson memory · terminal UI with 4 panels · branch, commit and labelled pull request |
-| **Bonus** (optional in the brief) | Complexity score 1–10 · self-healing tests (a Test Doctor) · LangSmith tracing · Daytona cloud sandbox |
-| **Plus** (beyond the brief) | Prompt-injection screen on issue text · plans instead of code for complex issues · independent reviewer on every pull request · self-improvement loop with versioned repo skills · dashboard · evaluation suite with one verdict · one-command repository setup (`connect`) |
+| Core requirements | Bonus features | Beyond the brief |
+|---|---|---|
+| Issue polling every 5 minutes | Complexity scoring (1–10) | Prompt-injection screening of every issue |
+| Triage into 5 task types, each with its own skill | Self-healing tests (Test Doctor) | Independent AI review of every pull request, with a merge-ready gate |
+| Multi-agent orchestration: Orchestrator, Repo Explorer, Coder, Test Agent, PR Agent | LangSmith tracing | Self-improvement loop that updates repository-specific skills, with your approval |
+| Token-budgeted repository map | Daytona cloud sandbox | A plan instead of code for complex issues |
+| Sandboxed execution with a command guard | | Dashboard to merge pull requests, approve skill changes and review every run |
+| Human approval gates | | Evaluation suite with a single verdict |
+| Working, session and lesson memory | | One-command repository setup (`connect`) |
+| Four-panel terminal UI | | |
+| Branch, commit and labelled pull request | | |
 
 ## Quick start
 

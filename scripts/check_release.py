@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 NOREPLY = "59106185+LijiAlex@users.noreply.github.com"
-README_SECTIONS = ["## Demo", "## How it works", "## Quick start", "## Using it", "## Connect your own repository",   # brief + guide:
+README_SECTIONS = ["## See It in Action", "## How it works", "## Quick start", "## Using it", "## Connect your own repository",   # brief + guide:
                    "## Architecture", "## Example pull requests", "## Results", "## Design choices",        # demo, setup, diagram,
                    "## Known limitations", "## For reviewers: the assignment brief", "## Credits"]           # example PR, decisions
 SECRET_PATTERNS = [re.compile(p) for p in (r"gh[pousr]_[A-Za-z0-9]{20,}", r"github_pat_[A-Za-z0-9_]{20,}", r"sk-ant-[A-Za-z0-9\-_]{20,}",
