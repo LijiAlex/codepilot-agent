@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 350" width="1600" height="350" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4A5561"/></marker>
+<style>
+.h1{font-size:26px;font-weight:700;fill:#18212B} .sub{font-size:14px;fill:#5B6773}
+.t{font-size:14.5px;font-weight:650;fill:#18212B} .s{font-size:12.5px;fill:#3B4651}
+.f{font-size:13.5px;font-weight:650;fill:#5B6773} .tag{font-size:10px;font-weight:700;fill:#fff;letter-spacing:.04em}
+.al{font-size:12px;fill:#4A5561;font-style:italic} .lg{font-size:13px;fill:#3B4651}
+</style></defs>
+<rect width="1600" height="350" fill="#F7F9FA"/>
+<text x="30" y="44" class="h1">Lessons</text>
+<rect x="143.5" y="27" width="46.0" height="20" rx="10" fill="#46546A"/>
+<text x="166.5" y="41" class="tag" text-anchor="middle">BRIEF</text>
+<text x="30" y="68" class="sub">What happened on past issues is recalled for similar new ones</text>
+<rect x="1040" y="30" width="18" height="18" rx="4" fill="#EAF1FD" stroke="#2F6FDB" stroke-width="1.6"/>
+<text x="1066" y="44" class="lg">AI agent / model</text>
+<rect x="1225" y="30" width="18" height="18" rx="4" fill="#E4F3F2" stroke="#0E7C7B" stroke-width="1.6"/>
+<text x="1251" y="44" class="lg">plain code</text>
+<rect x="1410" y="30" width="18" height="18" rx="4" fill="#FCEEDD" stroke="#C46A00" stroke-width="1.6"/>
+<text x="1436" y="44" class="lg">a person decides</text>
+<rect x="1040" y="56" width="46.0" height="17" rx="8.5" fill="#46546A"/>
+<text x="1063.0" y="68.5" class="tag" text-anchor="middle">BRIEF</text>
+<text x="1094.0" y="69" class="lg">assignment brief</text>
+<rect x="1225" y="56" width="46.0" height="17" rx="8.5" fill="#6B4FBB"/>
+<text x="1248.0" y="68.5" class="tag" text-anchor="middle">BONUS</text>
+<text x="1279.0" y="69" class="lg">brief optional extra</text>
+<rect x="1410" y="56" width="38.8" height="17" rx="8.5" fill="#B4366B"/>
+<text x="1429.4" y="68.5" class="tag" text-anchor="middle">PLUS</text>
+<text x="1456.8" y="69" class="lg">beyond the brief</text>
+<rect x="30" y="110" width="220" height="64" rx="9" fill="#FFFFFF" stroke="#5B6773" stroke-width="1.6"/>
+<text x="42" y="132" class="t">Pull request merged</text>
+<text x="42" y="151" class="s">what worked</text>
+<rect x="30" y="210" width="220" height="64" rx="9" fill="#FFFFFF" stroke="#5B6773" stroke-width="1.6"/>
+<text x="42" y="232" class="t">Run failed or rejected</text>
+<text x="42" y="251" class="s">what went wrong</text>
+<rect x="300" y="160" width="200" height="64" rx="9" fill="#E4F3F2" stroke="#0E7C7B" stroke-width="1.6"/>
+<text x="312" y="182" class="t">Lesson saved</text>
+<rect x="451.2" y="151" width="38.8" height="18" rx="9" fill="#0E7C7B"/>
+<text x="470.59999999999997" y="164" class="tag" text-anchor="middle">CODE</text>
+<text x="312" y="201" class="s">short and specific</text>
+<path d="M 250,142 L 275,142 L 275,185 L 298,185" fill="none" stroke="#4A5561" stroke-width="1.7" marker-end="url(#ah)" />
+<path d="M 250,242 L 275,242 L 275,200 L 298,200" fill="none" stroke="#4A5561" stroke-width="1.7" marker-end="url(#ah)" />
+<rect x="550" y="160" width="220" height="64" rx="9" fill="#F2F4F6" stroke="#5B6773" stroke-width="1.6"/>
+<text x="562" y="182" class="t">ChromaDB</text>
+<text x="562" y="201" class="s">per repository + task type</text>
+<path d="M 500,192 L 548,192" fill="none" stroke="#4A5561" stroke-width="1.7" marker-end="url(#ah)" />
+<rect x="820" y="160" width="210" height="64" rx="9" fill="#E4F3F2" stroke="#0E7C7B" stroke-width="1.6"/>
+<text x="832" y="182" class="t">Recall the 3 most similar</text>
+<rect x="981.2" y="151" width="38.8" height="18" rx="9" fill="#0E7C7B"/>
+<text x="1000.6" y="164" class="tag" text-anchor="middle">CODE</text>
+<text x="832" y="201" class="s">by meaning</text>
+<path d="M 770,192 L 818,192" fill="none" stroke="#4A5561" stroke-width="1.7" marker-end="url(#ah)" />
+<rect x="820" y="270" width="210" height="56" rx="9" fill="#FFFFFF" stroke="#5B6773" stroke-width="1.6"/>
+<text x="832" y="292" class="t">New issue</text>
+<text x="832" y="311" class="s">same repository</text>
+<path d="M 925,270 L 925,226" fill="none" stroke="#4A5561" stroke-width="1.7" marker-end="url(#ah)" />
+<rect x="1080" y="160" width="260" height="64" rx="9" fill="#EAF1FD" stroke="#2F6FDB" stroke-width="1.6"/>
+<text x="1092" y="182" class="t">Orchestrator and agents</text>
+<rect x="1305.6" y="151" width="24.4" height="18" rx="9" fill="#2F6FDB"/>
+<text x="1317.8" y="164" class="tag" text-anchor="middle">AI</text>
+<text x="1092" y="201" class="s">plan with them, marked untrusted</text>
+<path d="M 1030,192 L 1078,192" fill="none" stroke="#4A5561" stroke-width="1.7" marker-end="url(#ah)" />
+</svg>

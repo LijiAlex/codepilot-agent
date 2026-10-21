@@ -64,92 +64,23 @@ flowchart LR
 
 ### Solver
 
-```mermaid
-flowchart LR
-  A["Issue labelled ai-assignable"] --> B["Poller · every 5 min"]
-  T["Task typed in the terminal UI"] --> D
-  B --> C{"Injection screen"}
-  C -- blocked --> X["Skipped and logged"]
-  C -- passed --> D{"Triage · task type + complexity"}
-  D -- too complex --> PL["Plan"]
-  D -- fixable --> E["Context · repo map + skill + lessons"]
-  E --> O
-  subgraph SB["Daytona sandbox · no GitHub credentials · command guard on every call"]
-    O["Orchestrator"] -. "files not named" .-> RE["Repo Explorer"]
-    O --> CO["Coder"]
-    RE --> CO
-    CO --> TA["Test Agent"]
-    TA --> PA["PR Agent · drafts text"]
-  end
-  PA --> W["Run saves and ends"]
-  PL --> W
-  CO -- "over 5 files · unknown command" --> W
-  TA -- "3rd attempt" --> W
-  W --> H{"You decide · terminal UI"}
-  H -- reject --> L["Lesson saved"]
-  H -- approve --> P["Publish · re-check + one commit"]
-  P --> PR["Labelled pull request"]
-```
+![Solver flow: issue, poller, injection screen, triage, context, the agents in the sandbox, save and end, your approval, publish, pull request](docs/flows/solver.png)
 
 ### PR review
 
-```mermaid
-flowchart LR
-  A["PR opened or updated · CodePilot+, person or fork"] --> GA["GitHub Action"]
-  GA --> T["Job 1 · tests · no secrets"]
-  GA --> R["Job 2 · OpenAI review · 5 criteria × 0–2"]
-  F["Fork PR"] -. "diff only · code never runs" .-> R
-  T --> CAP["Code caps the score · security 4 · untested 6"]
-  R --> CAP
-  CAP --> M{"Score ≥ 8 · tests pass · no protected files"}
-  M -- yes --> MR["Label merge-ready"]
-  M -- no --> NR["Label needs-review"]
-  MR --> D["You merge · dashboard"]
-  NR --> P["A person decides"]
-  D --> W["PR watcher"]
-  W --> LS["Lesson saved"]
-```
+![PR review flow: GitHub Action runs tests and an OpenAI review, code caps the score and decides merge-ready, you merge, the PR watcher saves a lesson](docs/flows/pr-review.png)
 
 ### Self-improvement loop
 
-```mermaid
-flowchart LR
-  A["Run ends · any outcome"] --> B["Trace analysis · refused commands, files hard to find"]
-  B --> C["Skill gap report · AI"]
-  C --> D["One proposal · add, correct or retire a step"]
-  D --> E["Confidence rises when runs repeat it"]
-  E --> F{"You decide · dashboard"}
-  F -- approve --> G["Repo skill v+1 · old versions kept"]
-  F -- reject --> X["Recorded, not applied"]
-  G --> H["Next run on this repo uses it"]
-  H -.-> A
-```
+![Self-improvement loop: run ends, trace analysis, skill gap report, one proposal, confidence, you decide, repo skill v+1, used by the next run](docs/flows/self-improvement.png)
 
 ### Lessons
 
-```mermaid
-flowchart LR
-  A["PR merged"] --> L1["Lesson · what worked"]
-  B["Run failed or rejected"] --> L2["Lesson · what went wrong"]
-  L1 --> S[("ChromaDB · per repo + task type")]
-  L2 --> S
-  N["New issue"] --> Q["Recall 3 most similar"]
-  S --> Q
-  Q --> O["Orchestrator and agents · marked untrusted"]
-```
+![Lessons: merged PRs and failed or rejected runs become lessons in ChromaDB; the 3 most similar are recalled for a new issue](docs/flows/lessons.png)
 
 ### Connecting a repository
 
-```mermaid
-flowchart LR
-  A["codepilot connect OWNER/REPO"] --> B["Check access"]
-  B --> C["Create labels"]
-  C --> D["Detect install + test commands"]
-  D --> E["Build repo map"]
-  E --> F["Repo skill v1"]
-  F --> G["Code index"]
-  G --> H["Entry in codepilot.yml"]
-```
+![Connecting a repository: check access, create labels, detect setup, build repo map, repo skill v1, code index, codepilot.yml entry](docs/flows/connect.png)
 
 ## What's included
 

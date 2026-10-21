@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 240" width="1600" height="240" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4A5561"/></marker>
+<style>
+.h1{font-size:26px;font-weight:700;fill:#18212B} .sub{font-size:14px;fill:#5B6773}
+.t{font-size:14.5px;font-weight:650;fill:#18212B} .s{font-size:12.5px;fill:#3B4651}
+.f{font-size:13.5px;font-weight:650;fill:#5B6773} .tag{font-size:10px;font-weight:700;fill:#fff;letter-spacing:.04em}
+.al{font-size:12px;fill:#4A5561;font-style:italic} .lg{font-size:13px;fill:#3B4651}
+</style></defs>
+<rect width="1600" height="240" fill="#F7F9FA"/>
+<text x="30" y="44" class="h1">Connecting a repository</text>
+<rect x="375.5" y="27" width="38.8" height="20" rx="10" fill="#B4366B"/>
+<text x="394.9" y="41" class="tag" text-anchor="middle">PLUS</text>
+<text x="30" y="68" class="sub">One command prepares a repository for CodePilot+</text>
+<rect x="1040" y="30" width="18" height="18" rx="4" fill="#EAF1FD" stroke="#2F6FDB" stroke-width="1.6"/>
+<text x="1066" y="44" class="lg">AI agent / model</text>
+<rect x="1225" y="30" width="18" height="18" rx="4" fill="#E4F3F2" stroke="#0E7C7B" stroke-width="1.6"/>
+<text x="1251" y="44" class="lg">plain code</text>
+<rect x="1410" y="30" width="18" height="18" rx="4" fill="#FCEEDD" stroke="#C46A00" stroke-width="1.6"/>
+<text x="1436" y="44" class="lg">a person decides</text>
+<rect x="1040" y="56" width="46.0" height="17" rx="8.5" fill="#46546A"/>
+<text x="1063.0" y="68.5" class="tag" text-anchor="middle">BRIEF</text>
+<text x="1094.0" y="69" class="lg">assignment brief</text>
+<rect x="1225" y="56" width="46.0" height="17" rx="8.5" fill="#6B4FBB"/>
+<text x="1248.0" y="68.5" class="tag" text-anchor="middle">BONUS</text>
+<text x="1279.0" y="69" class="lg">brief optional extra</text>
+<rect x="1410" y="56" width="38.8" height="17" rx="8.5" fill="#B4366B"/>
+<text x="1429.4" y="68.5" class="tag" text-anchor="middle">PLUS</text>
+<text x="1456.8" y="69" class="lg">beyond the brief</text>
+<rect x="30" y="120" width="170" height="78" rx="9" fill="#FCEEDD" stroke="#C46A00" stroke-width="1.6"/>
+<text x="42" y="142" class="t">You run connect</text>
+<rect x="136.8" y="111" width="53.2" height="18" rx="9" fill="#C46A00"/>
+<text x="163.4" y="124" class="tag" text-anchor="middle">PERSON</text>
+<text x="42" y="161" class="s">codepilot connect</text>
+<text x="42" y="178" class="s">OWNER/REPO --write</text>
+<rect x="222" y="120" width="170" height="78" rx="9" fill="#E4F3F2" stroke="#0E7C7B" stroke-width="1.6"/>
+<text x="234" y="142" class="t">Check access</text>
+<rect x="343.2" y="111" width="38.8" height="18" rx="9" fill="#0E7C7B"/>
+<text x="362.59999999999997" y="124" class="tag" text-anchor="middle">CODE</text>
+<text x="234" y="161" class="s">through the GitHub App</text>
+<path d="M 200,159 L 220,159" fill="none" stroke="#4A5561" stroke-width="1.7" marker-end="url(#ah)" />
+<rect x="414" y="120" width="170" height="78" rx="9" fill="#E4F3F2" stroke="#0E7C7B" stroke-width="1.6"/>
+<text x="426" y="142" class="t">Create labels</text>
+<rect x="535.2" y="111" width="38.8" height="18" rx="9" fill="#0E7C7B"/>
+<text x="554.6" y="124" class="tag" text-anchor="middle">CODE</text>
+<text x="426" y="161" class="s">ai-assignable and</text>
+<text x="426" y="178" class="s">review labels</text>
+<path d="M 392,159 L 412,159" fill="none" stroke="#4A5561" stroke-width="1.7" marker-end="url(#ah)" />
+<rect x="606" y="120" width="170" height="78" rx="9" fill="#E4F3F2" stroke="#0E7C7B" stroke-width="1.6"/>
+<text x="618" y="142" class="t">Detect setup</text>
+<rect x="727.2" y="111" width="38.8" height="18" rx="9" fill="#0E7C7B"/>
+<text x="746.6" y="124" class="tag" text-anchor="middle">CODE</text>
+<text x="618" y="161" class="s">install and test</text>
+<text x="618" y="178" class="s">commands</text>
+<path d="M 584,159 L 604,159" fill="none" stroke="#4A5561" stroke-width="1.7" marker-end="url(#ah)" />
+<rect x="798" y="120" width="170" height="78" rx="9" fill="#E4F3F2" stroke="#0E7C7B" stroke-width="1.6"/>
+<text x="810" y="142" class="t">Build repo map</text>
+<rect x="919.2" y="111" width="38.8" height="18" rx="9" fill="#0E7C7B"/>
+<text x="938.6" y="124" class="tag" text-anchor="middle">CODE</text>
+<text x="810" y="161" class="s">ranked, within</text>
+<text x="810" y="178" class="s">the token budget</text>
+<path d="M 776,159 L 796,159" fill="none" stroke="#4A5561" stroke-width="1.7" marker-end="url(#ah)" />
+<rect x="990" y="120" width="170" height="78" rx="9" fill="#E4F3F2" stroke="#0E7C7B" stroke-width="1.6"/>
+<text x="1002" y="142" class="t">Repo skill v1</text>
+<rect x="1111.2" y="111" width="38.8" height="18" rx="9" fill="#0E7C7B"/>
+<text x="1130.6000000000001" y="124" class="tag" text-anchor="middle">CODE</text>
+<text x="1002" y="161" class="s">notes for this</text>
+<text x="1002" y="178" class="s">repository</text>
+<path d="M 968,159 L 988,159" fill="none" stroke="#4A5561" stroke-width="1.7" marker-end="url(#ah)" />
+<rect x="1182" y="120" width="170" height="78" rx="9" fill="#E4F3F2" stroke="#0E7C7B" stroke-width="1.6"/>
+<text x="1194" y="142" class="t">Code index</text>
+<rect x="1303.2" y="111" width="38.8" height="18" rx="9" fill="#0E7C7B"/>
+<text x="1322.6000000000001" y="124" class="tag" text-anchor="middle">CODE</text>
+<text x="1194" y="161" class="s">embeddings for</text>
+<text x="1194" y="178" class="s">search</text>
+<path d="M 1160,159 L 1180,159" fill="none" stroke="#4A5561" stroke-width="1.7" marker-end="url(#ah)" />
+<rect x="1374" y="120" width="170" height="78" rx="9" fill="#E4F3F2" stroke="#0E7C7B" stroke-width="1.6"/>
+<text x="1386" y="142" class="t">codepilot.yml</text>
+<rect x="1495.2" y="111" width="38.8" height="18" rx="9" fill="#0E7C7B"/>
+<text x="1514.6000000000001" y="124" class="tag" text-anchor="middle">CODE</text>
+<text x="1386" y="161" class="s">the repository's</text>
+<text x="1386" y="178" class="s">entry is added</text>
+<path d="M 1352,159 L 1372,159" fill="none" stroke="#4A5561" stroke-width="1.7" marker-end="url(#ah)" />
+</svg>

@@ -1,0 +1,173 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 640" width="1600" height="640" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4A5561"/></marker>
+<style>
+.h1{font-size:26px;font-weight:700;fill:#18212B} .sub{font-size:14px;fill:#5B6773}
+.t{font-size:14.5px;font-weight:650;fill:#18212B} .s{font-size:12.5px;fill:#3B4651}
+.f{font-size:13.5px;font-weight:650;fill:#5B6773} .tag{font-size:10px;font-weight:700;fill:#fff;letter-spacing:.04em}
+.al{font-size:12px;fill:#4A5561;font-style:italic} .lg{font-size:13px;fill:#3B4651}
+</style></defs>
+<rect width="1600" height="640" fill="#F7F9FA"/>
+<text x="30" y="44" class="h1">Solver</text>
+<text x="30" y="68" class="sub">From a labelled issue to a pull request, with a person deciding before anything reaches GitHub</text>
+<rect x="1040" y="30" width="18" height="18" rx="4" fill="#EAF1FD" stroke="#2F6FDB" stroke-width="1.6"/>
+<text x="1066" y="44" class="lg">AI agent / model</text>
+<rect x="1225" y="30" width="18" height="18" rx="4" fill="#E4F3F2" stroke="#0E7C7B" stroke-width="1.6"/>
+<text x="1251" y="44" class="lg">plain code</text>
+<rect x="1410" y="30" width="18" height="18" rx="4" fill="#FCEEDD" stroke="#C46A00" stroke-width="1.6"/>
+<text x="1436" y="44" class="lg">a person decides</text>
+<rect x="1040" y="56" width="46.0" height="17" rx="8.5" fill="#46546A"/>
+<text x="1063.0" y="68.5" class="tag" text-anchor="middle">BRIEF</text>
+<text x="1094.0" y="69" class="lg">assignment brief</text>
+<rect x="1225" y="56" width="46.0" height="17" rx="8.5" fill="#6B4FBB"/>
+<text x="1248.0" y="68.5" class="tag" text-anchor="middle">BONUS</text>
+<text x="1279.0" y="69" class="lg">brief optional extra</text>
+<rect x="1410" y="56" width="38.8" height="17" rx="8.5" fill="#B4366B"/>
+<text x="1429.4" y="68.5" class="tag" text-anchor="middle">PLUS</text>
+<text x="1456.8" y="69" class="lg">beyond the brief</text>
+<rect x="30" y="110" width="190" height="72" rx="9" fill="#FFFFFF" stroke="#5B6773" stroke-width="1.6"/>
+<text x="42" y="132" class="t">GitHub issue</text>
+<text x="42" y="151" class="s">labelled ai-assignable</text>
+<rect x="250" y="110" width="190" height="72" rx="9" fill="#E4F3F2" stroke="#0E7C7B" stroke-width="1.6"/>
+<text x="262" y="132" class="t">Poller</text>
+<rect x="391.2" y="101" width="38.8" height="18" rx="9" fill="#0E7C7B"/>
+<text x="410.59999999999997" y="114" class="tag" text-anchor="middle">CODE</text>
+<rect x="339.2" y="101" width="46.0" height="18" rx="9" fill="#46546A"/>
+<text x="362.2" y="114" class="tag" text-anchor="middle">BRIEF</text>
+<text x="262" y="151" class="s">every 5 min, skips claimed</text>
+<text x="262" y="168" class="s">or recently failed issues</text>
+<rect x="470" y="110" width="220" height="72" rx="9" fill="#E4F3F2" stroke="#0E7C7B" stroke-width="1.6"/>
+<text x="482" y="132" class="t">Clean + injection screen</text>
+<rect x="641.2" y="101" width="38.8" height="18" rx="9" fill="#0E7C7B"/>
+<text x="660.6" y="114" class="tag" text-anchor="middle">CODE</text>
+<rect x="596.4000000000001" y="101" width="38.8" height="18" rx="9" fill="#B4366B"/>
+<text x="615.8000000000001" y="114" class="tag" text-anchor="middle">PLUS</text>
+<text x="482" y="151" class="s">NeMo rails: regex + Haiku</text>
+<text x="482" y="168" class="s">check</text>
+<rect x="720" y="110" width="190" height="72" rx="9" fill="#EAF1FD" stroke="#2F6FDB" stroke-width="1.6"/>
+<text x="732" y="132" class="t">Triage</text>
+<rect x="875.6" y="101" width="24.4" height="18" rx="9" fill="#2F6FDB"/>
+<text x="887.8000000000001" y="114" class="tag" text-anchor="middle">AI</text>
+<rect x="823.6" y="101" width="46.0" height="18" rx="9" fill="#46546A"/>
+<text x="846.6" y="114" class="tag" text-anchor="middle">BRIEF</text>
+<text x="732" y="151" class="s">5 task types → skill</text>
+<text x="732" y="168" class="s">complexity 1–10 (bonus)</text>
+<rect x="940" y="110" width="260" height="72" rx="9" fill="#E4F3F2" stroke="#0E7C7B" stroke-width="1.6"/>
+<text x="952" y="132" class="t">Context for the agents</text>
+<rect x="1151.2" y="101" width="38.8" height="18" rx="9" fill="#0E7C7B"/>
+<text x="1170.6000000000001" y="114" class="tag" text-anchor="middle">CODE</text>
+<rect x="1099.2" y="101" width="46.0" height="18" rx="9" fill="#46546A"/>
+<text x="1122.2" y="114" class="tag" text-anchor="middle">BRIEF</text>
+<text x="952" y="151" class="s">repo map ≤ 4,000 tokens,</text>
+<text x="952" y="168" class="s">task skill + repo skill, 3 lessons</text>
+<path d="M 220,146 L 248,146" fill="none" stroke="#4A5561" stroke-width="1.7" marker-end="url(#ah)" />
+<path d="M 440,146 L 468,146" fill="none" stroke="#4A5561" stroke-width="1.7" marker-end="url(#ah)" />
+<path d="M 690,146 L 718,146" fill="none" stroke="#4A5561" stroke-width="1.7" marker-end="url(#ah)" />
+<path d="M 910,146 L 938,146" fill="none" stroke="#4A5561" stroke-width="1.7" marker-end="url(#ah)" />
+<rect x="470" y="210" width="220" height="56" rx="9" fill="#E4F3F2" stroke="#0E7C7B" stroke-width="1.6"/>
+<text x="482" y="232" class="t">Blocked</text>
+<rect x="641.2" y="201" width="38.8" height="18" rx="9" fill="#0E7C7B"/>
+<text x="660.6" y="214" class="tag" text-anchor="middle">CODE</text>
+<text x="482" y="251" class="s">skipped and logged</text>
+<path d="M 580,182 L 580,208" fill="none" stroke="#4A5561" stroke-width="1.7" marker-end="url(#ah)" />
+<text x="610" y="200" class="al" text-anchor="middle">attack</text>
+<rect x="720" y="210" width="190" height="56" rx="9" fill="#EAF1FD" stroke="#2F6FDB" stroke-width="1.6"/>
+<text x="732" y="232" class="t">Too complex</text>
+<rect x="875.6" y="201" width="24.4" height="18" rx="9" fill="#2F6FDB"/>
+<text x="887.8000000000001" y="214" class="tag" text-anchor="middle">AI</text>
+<rect x="830.8000000000001" y="201" width="38.8" height="18" rx="9" fill="#B4366B"/>
+<text x="850.2" y="214" class="tag" text-anchor="middle">PLUS</text>
+<text x="732" y="251" class="s">a plan instead of code</text>
+<path d="M 815,182 L 815,208" fill="none" stroke="#4A5561" stroke-width="1.7" marker-end="url(#ah)" />
+<rect x="30" y="300" width="1540" height="175" rx="14" fill="none" stroke="#8A96A3" stroke-width="1.4" stroke-dasharray="6 5"/>
+<text x="274" y="322" class="f">One run · fresh Daytona sandbox · whole repository · no GitHub credentials</text>
+<rect x="848.4" y="309" width="44.0" height="17" rx="8.5" fill="#6B4FBB"/>
+<text x="870.4" y="321.5" class="tag" text-anchor="middle">BONUS</text>
+<path d="M 1070,182 L 1070,282 L 155,282 L 155,343" fill="none" stroke="#4A5561" stroke-width="1.7" marker-end="url(#ah)" />
+<rect x="60" y="345" width="190" height="80" rx="9" fill="#EAF1FD" stroke="#2F6FDB" stroke-width="1.6"/>
+<text x="72" y="367" class="t">Orchestrator</text>
+<rect x="215.6" y="336" width="24.4" height="18" rx="9" fill="#2F6FDB"/>
+<text x="227.79999999999998" y="349" class="tag" text-anchor="middle">AI</text>
+<rect x="163.6" y="336" width="46.0" height="18" rx="9" fill="#46546A"/>
+<text x="186.6" y="349" class="tag" text-anchor="middle">BRIEF</text>
+<text x="72" y="386" class="s">plans, hands out work</text>
+<text x="72" y="403" class="s">by file path</text>
+<rect x="300" y="345" width="210" height="80" rx="9" fill="#EAF1FD" stroke="#2F6FDB" stroke-width="1.6"/>
+<text x="312" y="367" class="t">Repo Explorer</text>
+<rect x="475.6" y="336" width="24.4" height="18" rx="9" fill="#2F6FDB"/>
+<text x="487.8" y="349" class="tag" text-anchor="middle">AI</text>
+<rect x="423.6" y="336" width="46.0" height="18" rx="9" fill="#46546A"/>
+<text x="446.6" y="349" class="tag" text-anchor="middle">BRIEF</text>
+<text x="312" y="386" class="s">only if the issue doesn't</text>
+<text x="312" y="403" class="s">name the files</text>
+<rect x="560" y="345" width="190" height="80" rx="9" fill="#EAF1FD" stroke="#2F6FDB" stroke-width="1.6"/>
+<text x="572" y="367" class="t">Coder</text>
+<rect x="715.6" y="336" width="24.4" height="18" rx="9" fill="#2F6FDB"/>
+<text x="727.8000000000001" y="349" class="tag" text-anchor="middle">AI</text>
+<rect x="663.6" y="336" width="46.0" height="18" rx="9" fill="#46546A"/>
+<text x="686.6" y="349" class="tag" text-anchor="middle">BRIEF</text>
+<text x="572" y="386" class="s">small edits,</text>
+<text x="572" y="403" class="s">runs the code</text>
+<rect x="800" y="345" width="210" height="80" rx="9" fill="#EAF1FD" stroke="#2F6FDB" stroke-width="1.6"/>
+<text x="812" y="367" class="t">Test Agent</text>
+<rect x="975.6" y="336" width="24.4" height="18" rx="9" fill="#2F6FDB"/>
+<text x="987.8000000000001" y="349" class="tag" text-anchor="middle">AI</text>
+<rect x="923.6" y="336" width="46.0" height="18" rx="9" fill="#46546A"/>
+<text x="946.6" y="349" class="tag" text-anchor="middle">BRIEF</text>
+<text x="812" y="386" class="s">writes + runs tests, max 3;</text>
+<text x="812" y="403" class="s">Test Doctor fixes setup (bonus)</text>
+<rect x="1060" y="345" width="200" height="80" rx="9" fill="#EAF1FD" stroke="#2F6FDB" stroke-width="1.6"/>
+<text x="1072" y="367" class="t">PR Agent</text>
+<rect x="1225.6" y="336" width="24.4" height="18" rx="9" fill="#2F6FDB"/>
+<text x="1237.8" y="349" class="tag" text-anchor="middle">AI</text>
+<rect x="1173.6" y="336" width="46.0" height="18" rx="9" fill="#46546A"/>
+<text x="1196.6" y="349" class="tag" text-anchor="middle">BRIEF</text>
+<text x="1072" y="386" class="s">drafts commit</text>
+<text x="1072" y="403" class="s">and PR text</text>
+<rect x="1310" y="345" width="240" height="80" rx="9" fill="#E4F3F2" stroke="#0E7C7B" stroke-width="1.6"/>
+<text x="1322" y="367" class="t">Guards on every tool call</text>
+<rect x="1501.2" y="336" width="38.8" height="18" rx="9" fill="#0E7C7B"/>
+<text x="1520.6000000000001" y="349" class="tag" text-anchor="middle">CODE</text>
+<rect x="1449.2" y="336" width="46.0" height="18" rx="9" fill="#46546A"/>
+<text x="1472.2" y="349" class="tag" text-anchor="middle">BRIEF</text>
+<text x="1322" y="386" class="s">commands: allow / refuse / ask</text>
+<text x="1322" y="403" class="s">writes only inside the sandbox</text>
+<path d="M 250,385 L 298,385" fill="none" stroke="#4A5561" stroke-width="1.7" marker-end="url(#ah)" stroke-dasharray="5 4"/>
+<path d="M 510,385 L 558,385" fill="none" stroke="#4A5561" stroke-width="1.7" marker-end="url(#ah)" />
+<path d="M 750,385 L 798,385" fill="none" stroke="#4A5561" stroke-width="1.7" marker-end="url(#ah)" />
+<path d="M 1010,385 L 1058,385" fill="none" stroke="#4A5561" stroke-width="1.7" marker-end="url(#ah)" />
+<path d="M 155,425 L 155,450 L 655,450 L 655,427" fill="none" stroke="#4A5561" stroke-width="1.7" marker-end="url(#ah)" />
+<text x="405" y="465" class="al" text-anchor="middle">issue already names the files</text>
+<rect x="30" y="530" width="230" height="80" rx="9" fill="#E4F3F2" stroke="#0E7C7B" stroke-width="1.6"/>
+<text x="42" y="552" class="t">Save and end the run</text>
+<rect x="211.2" y="521" width="38.8" height="18" rx="9" fill="#0E7C7B"/>
+<text x="230.6" y="534" class="tag" text-anchor="middle">CODE</text>
+<rect x="166.39999999999998" y="521" width="38.8" height="18" rx="9" fill="#B4366B"/>
+<text x="185.79999999999998" y="534" class="tag" text-anchor="middle">PLUS</text>
+<text x="42" y="571" class="s">no sandbox waits</text>
+<text x="42" y="588" class="s">for a person</text>
+<path d="M 1160,425 L 1160,500 L 145,500 L 145,528" fill="none" stroke="#4A5561" stroke-width="1.7" marker-end="url(#ah)" />
+<text x="650" y="494" class="al" text-anchor="middle">also on: over 5 files · a 3rd test attempt · an unknown command · a plan</text>
+<rect x="300" y="530" width="260" height="80" rx="9" fill="#FCEEDD" stroke="#C46A00" stroke-width="1.6"/>
+<text x="312" y="552" class="t">You decide · terminal UI</text>
+<rect x="496.8" y="521" width="53.2" height="18" rx="9" fill="#C46A00"/>
+<text x="523.4" y="534" class="tag" text-anchor="middle">PERSON</text>
+<rect x="444.8" y="521" width="46.0" height="18" rx="9" fill="#46546A"/>
+<text x="467.8" y="534" class="tag" text-anchor="middle">BRIEF</text>
+<text x="312" y="571" class="s">inspect the diff, tests, PR text</text>
+<text x="312" y="588" class="s">approve or reject</text>
+<rect x="600" y="530" width="280" height="80" rx="9" fill="#E4F3F2" stroke="#0E7C7B" stroke-width="1.6"/>
+<text x="612" y="552" class="t">Publish</text>
+<rect x="831.2" y="521" width="38.8" height="18" rx="9" fill="#0E7C7B"/>
+<text x="850.6" y="534" class="tag" text-anchor="middle">CODE</text>
+<rect x="779.2" y="521" width="46.0" height="18" rx="9" fill="#46546A"/>
+<text x="802.2" y="534" class="tag" text-anchor="middle">BRIEF</text>
+<text x="612" y="571" class="s">re-checks the issue and main,</text>
+<text x="612" y="588" class="s">one commit with the approved change</text>
+<rect x="920" y="530" width="260" height="80" rx="9" fill="#FFFFFF" stroke="#5B6773" stroke-width="1.6"/>
+<text x="932" y="552" class="t">Pull request on GitHub</text>
+<text x="932" y="571" class="s">labelled, linked to the issue</text>
+<text x="932" y="588" class="s">→ independent review</text>
+<path d="M 260,570 L 298,570" fill="none" stroke="#4A5561" stroke-width="1.7" marker-end="url(#ah)" />
+<path d="M 560,570 L 598,570" fill="none" stroke="#4A5561" stroke-width="1.7" marker-end="url(#ah)" />
+<path d="M 880,570 L 918,570" fill="none" stroke="#4A5561" stroke-width="1.7" marker-end="url(#ah)" />
+</svg>
