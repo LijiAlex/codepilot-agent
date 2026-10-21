@@ -15,7 +15,7 @@ CodePilot+ is a multi-agent coding platform that turns a labelled GitHub issue i
 - The system learns from each run and proposes improvements to its own playbooks, which take effect only when you approve them.
 - A terminal UI shows the work as it happens, and a dashboard records everything afterwards.
 
-**Contents:** [See it in action](#see-it-in-action) · [How it works](#how-it-works) · [What's included](#whats-included) · [Flows](#flows) · [Quick start](#quick-start) · [Using it](#using-it) · [Connect your own repository](#connect-your-own-repository) · [Architecture](#architecture) · [Example pull requests](#example-pull-requests) · [Safety](#safety) · [Results](#results) · [Design choices](#design-choices) · [For reviewers](#for-reviewers-the-assignment-brief) · [Known limitations](#known-limitations)
+**Contents:** [See it in action](#see-it-in-action) · [What's included](#whats-included) · [Flows](#flows) · [Quick start](#quick-start) · [Using it](#using-it) · [Connect your own repository](#connect-your-own-repository) · [Architecture](#architecture) · [Example pull requests](#example-pull-requests) · [Safety](#safety) · [Results](#results) · [Design choices](#design-choices) · [For reviewers](#for-reviewers-the-assignment-brief) · [Known limitations](#known-limitations)
 
 ## CodePilot+ in a nut shell
 
@@ -34,16 +34,6 @@ https://github.com/user-attachments/assets/014654ff-ab4b-4968-90a4-cfe01fa8bc64
 ![CodePilot+ terminal UI showing issue polling, prompt-injection blocking, task triage, agent logs, and pending approvals](docs/tui.gif)
 
 *The terminal UI during a live run. Track issue polling and task progress, inspect agent logs, see prompt-injection attempts blocked, and review changes awaiting your approval.*
-
-## How it works
-
-1. **Watch.** Every 5 minutes CodePilot+ checks your repositories for open issues labelled `ai-assignable` (or you type a task in the terminal).
-2. **Screen.** The issue text is cleaned and checked for prompt injection (instructions hidden in an issue to trick the AI) before any agent reads it.
-3. **Triage.** The issue is sorted into one of five task types (bug fix, feature, dependency update, documentation, configuration) and scored 1–10 for complexity. The type picks the playbook (*skill*) the agents follow. Issues that are too complex get a written plan for you to approve instead of code.
-4. **Solve.** In a fresh cloud sandbox holding a copy of the repository and no GitHub credentials, an Orchestrator agent plans and hands out work: a Repo Explorer finds the files (only if the issue doesn't name them), a Coder edits, a Test Agent writes and runs the tests, a PR Agent drafts the text.
-5. **Approve.** The run saves its work and ends; the item waits in the terminal's approval panel until you approve or reject it.
-6. **Publish.** Plain code re-checks the issue and the main branch, commits exactly the approved change and opens one labelled pull request.
-7. **Review and learn.** A different company's AI model scores every pull request. Merged work becomes a lesson, and after every run CodePilot+ proposes one improvement to the repository's playbook for you to approve.
 
 ## What's included
 
