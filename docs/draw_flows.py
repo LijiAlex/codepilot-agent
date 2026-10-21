@@ -6,7 +6,7 @@ from pathlib import Path
 C = {  # kind: (stroke, fill, tag text)
     "ai":     ("#2F6FDB", "#EAF1FD", "AI"),
     "code":   ("#0E7C7B", "#E4F3F2", "CODE"),
-    "person": ("#C46A00", "#FCEEDD", "PERSON"),
+    "person": ("#C46A00", "#FCEEDD", "HUMAN"),
     "ext":    ("#5B6773", "#FFFFFF", ""),
     "store":  ("#5B6773", "#F2F4F6", ""),
 }
@@ -68,7 +68,7 @@ def header(title, sub, scope=None):
         out.append(f'<text x="{tx+sw/2}" y="41" class="tag" text-anchor="middle">{st}</text>')
     out.append(f'<text x="30" y="68" class="sub">{esc(sub)}</text>')
     lx = 1040
-    for i, (k, label) in enumerate([("ai", "AI agent / model"), ("code", "plain code"), ("person", "a person decides")]):
+    for i, (k, label) in enumerate([("ai", "AI agent / model"), ("code", "plain code"), ("person", "a human decides")]):
         stroke, fill, _ = C[k]
         out.append(f'<rect x="{lx + i*185}" y="30" width="18" height="18" rx="4" fill="{fill}" stroke="{stroke}" stroke-width="1.6"/>')
         out.append(f'<text x="{lx + i*185 + 26}" y="44" class="lg">{label}</text>')
@@ -97,10 +97,10 @@ def save(path, W, H):
 
 
 def solver():
-    header("Solver", "From a labelled issue to a pull request, with a person deciding before anything reaches GitHub")
+    header("Solver", "From a labelled issue to a pull request, with a human deciding before anything reaches GitHub")
     box(30, 110, 190, 72, "GitHub issue", ["labelled ai-assignable"], "ext", tag=False)
     box(250, 110, 190, 72, "Poller", ["every 5 min, skips claimed", "or recently failed issues"], "code", scope="brief")
-    box(470, 110, 220, 72, "Clean + injection screen", ["NeMo rails: regex + Haiku", "check"], "code", plus=True)
+    box(470, 110, 220, 72, "Clean + injection screen", ["NeMo: regex rail +", "Claude Haiku self-check"], "ai", plus=True)
     box(720, 110, 190, 72, "Triage", ["5 task types → skill", "complexity 1–10 (bonus)"], "ai", scope="brief")
     box(940, 110, 260, 72, "Context for the agents", ["repo map ≤ 4,000 tokens,", "task skill + repo skill, 3 lessons"], "code", scope="brief")
     arrow([(220, 146), (248, 146)]); arrow([(440, 146), (468, 146)])
@@ -121,9 +121,9 @@ def solver():
     arrow([(510, 385), (558, 385)]); arrow([(750, 385), (798, 385)]); arrow([(1010, 385), (1058, 385)])
     arrow([(155, 425), (155, 450), (655, 450), (655, 427)])
     out.append('<text x="405" y="465" class="al" text-anchor="middle">issue already names the files</text>')
-    box(30, 530, 230, 80, "Save and end the run", ["no sandbox waits", "for a person"], "code", scope="plus")
+    box(30, 530, 230, 80, "Save and end the run", ["no sandbox waits", "for a human"], "code", scope="plus")
     arrow([(1160, 425), (1160, 500), (145, 500), (145, 528)])
-    out.append('<text x="650" y="494" class="al" text-anchor="middle">also on: over 5 files · a 3rd test attempt · an unknown command · a plan</text>')
+    out.append('<text x="650" y="494" class="al" text-anchor="middle">also paused on: tests failing after 2 attempts · an unknown command · a plan</text>')
     box(300, 530, 260, 80, "You decide · terminal UI", ["inspect the diff, tests, PR text", "approve or reject"], "person", scope="brief")
     box(600, 530, 280, 80, "Publish", ["re-checks the issue and main,", "one commit with the approved change"], "code", scope="brief")
     box(920, 530, 260, 80, "Pull request on GitHub", ["labelled, linked to the issue", "→ independent review"], "ext", tag=False)
@@ -132,19 +132,19 @@ def solver():
 
 
 def review():
-    header("PR review", scope="plus", sub="Every pull request is scored by a model from a different company; code decides merge-ready")
-    box(30, 150, 230, 90, "Pull request", ["opened or updated by", "CodePilot+, a person or a fork"], "ext", tag=False)
+    header("PR review", scope="plus", sub="Every CodePilot+ pull request is scored by a model from a different company; code decides merge-ready")
+    box(30, 150, 230, 90, "Pull request", ["opened or updated by", "CodePilot+, a human or a fork"], "ext", tag=False)
     frame(300, 100, 520, 230, "Independent reviewer · GitHub Action")
     box(320, 140, 220, 74, "Job 1: tests", ["runs the PR's tests, no secrets;", "not run for forks"], "code")
     box(320, 236, 220, 74, "Job 2: review", ["OpenAI model scores", "5 criteria × 0–2"], "ai")
     box(580, 180, 220, 90, "Score caps", ["security concerns → max 4", "tests not run or failing", "→ max 6"], "code")
     arrow([(260, 195), (280, 195), (280, 177), (318, 177)]); arrow([(280, 195), (280, 273), (318, 273)])
     arrow([(540, 177), (560, 177), (560, 215), (578, 215)]); arrow([(540, 273), (560, 273), (560, 235), (578, 235)])
-    box(860, 180, 230, 90, "Merge-ready?", ["score ≥ 8, tests pass,", "no protected files"], "code")
+    box(860, 170, 230, 110, "Merge-ready?", ["score ≥ 8, tests pass,", "no security concerns,", "≤ 200 lines changed,", "no protected files"], "code")
     arrow([(800, 225), (858, 225)])
     box(1140, 110, 200, 74, "You merge", ["from the dashboard"], "person")
     box(1370, 110, 200, 74, "PR watcher", ["merged → lesson saved", "conflict → run stops"], "code")
-    box(1140, 260, 200, 74, "A person decides", ["labelled needs-review"], "person")
+    box(1140, 260, 200, 74, "A human decides", ["labelled needs-review"], "person")
     arrow([(1090, 205), (1115, 205), (1115, 147), (1138, 147)], "yes", 1104, 170)
     arrow([(1090, 245), (1115, 245), (1115, 297), (1138, 297)], "no", 1104, 280)
     arrow([(1340, 147), (1368, 147)])

@@ -6,7 +6,7 @@ W, H = 1600, 1010
 C = {  # kind: (stroke, fill, tag text)
     "ai":     ("#2F6FDB", "#EAF1FD", "AI"),
     "code":   ("#0E7C7B", "#E4F3F2", "CODE"),
-    "person": ("#C46A00", "#FCEEDD", "PERSON"),
+    "person": ("#C46A00", "#FCEEDD", "HUMAN"),
     "ext":    ("#5B6773", "#FFFFFF", ""),
     "store":  ("#5B6773", "#F2F4F6", ""),
 }
@@ -53,7 +53,7 @@ def arrow(points, label=None, lx=None, ly=None, dashed=False, color="#4A5561"):
 out.append('<text x="30" y="44" class="h1">CodePilot+ — architecture</text>')
 out.append('<text x="30" y="68" class="sub">GitHub issue → screened → agents in a sandbox → human approval → pull request → independent review → merge → lessons</text>')
 lx = 1040
-for i, (k, label) in enumerate([("ai", "AI agent / model"), ("code", "plain code"), ("person", "a person decides")]):
+for i, (k, label) in enumerate([("ai", "AI agent / model"), ("code", "plain code"), ("person", "a human decides")]):
     stroke, fill, _ = C[k]
     out.append(f'<rect x="{lx + i*185}" y="30" width="18" height="18" rx="4" fill="{fill}" stroke="{stroke}" stroke-width="1.6"/>')
     out.append(f'<text x="{lx + i*185 + 26}" y="44" class="lg">{label}</text>')
@@ -67,7 +67,7 @@ box(30, 760, 200, 106, "You · dashboard", ["merge pull requests,", "approve ski
 
 # ---- row 1: intake ----
 box(260, 110, 195, 72, "Poller", ["every 5 min, GitHub Toolkit", "skips claimed / recently failed"], "code")
-box(475, 110, 225, 72, "Clean + injection screen", ["NeMo rails: regex + Haiku check", "blocked issues never reach agents"], "code")
+box(475, 110, 225, 72, "Clean + injection screen", ["NeMo: regex rail + Claude Haiku", "self-check; blocked issues stop"], "ai")
 box(720, 110, 200, 72, "Triage", ["5 task types → which skill", "complexity score 1–10"], "ai")
 box(940, 110, 190, 72, "Too complex?", ["a plan goes to approval", "instead of code"], "ai", plus=True)
 arrow([(230, 146), (258, 146)])
@@ -89,7 +89,7 @@ for x in (622, 760, 897):
 box(680, 472, 160, 84, "Test Agent", ["writes + runs tests,", "max 3 attempts;", "Test Doctor fixes setup"], "ai", tag=False)
 arrow([(760, 440), (760, 470)])
 box(870, 452, 245, 98, "Guards on every tool call", ["commands: allow / refuse / ask", "write only inside the sandbox", "no secret files", "file check before publishing"], "code")
-box(280, 422, 230, 128, "Save and end the run", ["the run saves its work and", "frees the sandbox; nothing", "waits on a person", "(then: approval queue)"], "code")
+box(280, 422, 230, 128, "Save and end the run", ["the run saves its work and", "frees the sandbox; nothing", "waits on a human", "(then: approval queue)"], "code")
 
 # ---- row 3: approval + publish ----
 box(260, 600, 270, 100, "Approval queue", ["open PR to main (+ >5 files flag)", "retry after 2 failed test runs", "unknown command · complex plan"], "code")
@@ -107,7 +107,7 @@ frame(1170, 222, 400, 250, "Independent reviewer · GitHub Action", plus=True)
 arrow([(1370, 182), (1370, 220)])
 box(1190, 262, 170, 78, "Job 1: tests", ["runs the PR's tests,", "holds no secrets"], "code")
 box(1375, 262, 175, 78, "Job 2: review", ["OpenAI model — a", "different company"], "ai")
-box(1190, 352, 360, 104, "Score and merge-ready", ["5 criteria × 0–2 = score /10 · effort 1–5 from the diff", "caps: security → 4, tests not run/failing → 6", "merge-ready: score ≥ 8, tests green, no protected", "files · fork PRs reviewed from the diff only"], "code")
+box(1190, 352, 360, 104, "Score and merge-ready", ["5 criteria × 0–2 = score /10 · effort 1–5 from the diff", "caps: security → 4, tests not run/failing → 6", "merge-ready: score ≥ 8, tests green, no security", "concerns, ≤ 200 lines, no protected files"], "code")
 arrow([(1275, 340), (1275, 350)]); arrow([(1462, 340), (1462, 350)])
 
 # ---- right column: self-improvement + evaluation ----

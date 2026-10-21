@@ -16,7 +16,7 @@
 <rect x="1225" y="30" width="18" height="18" rx="4" fill="#E4F3F2" stroke="#0E7C7B" stroke-width="1.6"/>
 <text x="1251" y="44" class="lg">plain code</text>
 <rect x="1410" y="30" width="18" height="18" rx="4" fill="#FCEEDD" stroke="#C46A00" stroke-width="1.6"/>
-<text x="1436" y="44" class="lg">a person decides</text>
+<text x="1436" y="44" class="lg">a human decides</text>
 <rect x="1040" y="56" width="46.0" height="17" rx="8.5" fill="#46546A"/>
 <text x="1063.0" y="68.5" class="tag" text-anchor="middle">BRIEF</text>
 <text x="1094.0" y="69" class="lg">assignment brief</text>
@@ -28,8 +28,8 @@
 <text x="1456.8" y="69" class="lg">beyond the brief</text>
 <rect x="30" y="120" width="170" height="78" rx="9" fill="#FCEEDD" stroke="#C46A00" stroke-width="1.6"/>
 <text x="42" y="142" class="t">You run connect</text>
-<rect x="136.8" y="111" width="53.2" height="18" rx="9" fill="#C46A00"/>
-<text x="163.4" y="124" class="tag" text-anchor="middle">PERSON</text>
+<rect x="144.0" y="111" width="46.0" height="18" rx="9" fill="#C46A00"/>
+<text x="167.0" y="124" class="tag" text-anchor="middle">HUMAN</text>
 <text x="42" y="161" class="s">codepilot connect</text>
 <text x="42" y="178" class="s">OWNER/REPO --write</text>
 <rect x="222" y="120" width="170" height="78" rx="9" fill="#E4F3F2" stroke="#0E7C7B" stroke-width="1.6"/>

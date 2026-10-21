@@ -18,7 +18,7 @@ dependencies = [
   "pyyaml",
   "pydantic",
   "guardrail-eval-pipeline",
-  "fastapi",       # dashboard (Plus); already locked as a dependency of guardrail-eval-pipeline
+  "fastapi",       # dashboard
   "uvicorn",
   "nemoguardrails>=0.24.1",
 ]
@@ -27,11 +27,11 @@ dependencies = [
 codepilot = "codepilot.cli:main"
 
 [project.optional-dependencies]
-# Plus, Task 32: JS/TS/Go symbols in the repo map. New packages approved by the user on 2026-10-17.
+# JS/TS/Go symbols in the repo map.
 maps = ["tree-sitter==0.26.0", "tree-sitter-javascript==0.25.0", "tree-sitter-typescript==0.23.2", "tree-sitter-go==0.25.0"]
 
 [dependency-groups]
-dev = ["pytest", "anyio", "pyjwt", "cryptography"]   # last two already locked via PyGithub; tests import them directly
+dev = ["pytest", "anyio", "pyjwt", "cryptography"]   # tests import the last two directly
 
 [build-system]
 requires = ["hatchling"]

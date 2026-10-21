@@ -1,17 +1,13 @@
 # codepilot.example.yml — copy to codepilot.yml (gitignored) and edit
+# Repositories CodePilot+ watches. `scripts/with-env codepilot connect OWNER/REPO --write` adds an entry
+# here for you. You can also write one by hand, like the example below (remove the leading # to use it).
 repos:
-  - owner: LijiAlex
-    name: layered-memory
-    test_command: "python -m pytest -q"
-    install_command: "pip install pytest"
-    protected_paths: [".claude-plugin/**", "plugins/*/.claude-plugin/**"]   # added to the defaults (version fields)
-    author_allowlist: [LijiAlex]
-  - owner: LijiAlex
-    name: codepilot-playground
-    test_command: "python -m pytest -q"
-    install_command: "pip install -e . pytest"
-    protected_paths: ["tests/test_contract_*.py"]        # files agents must never change
-    author_allowlist: [LijiAlex]
+#  - owner: your-github-login                       # the repository's owner
+#    name: your-repo                                # the repository's name
+#    install_command: "pip install -e . pytest"     # installs the project and pytest in the sandbox
+#    test_command: "python -m pytest -q"            # runs its tests
+#    protected_paths: ["tests/test_contract_*.py"]  # extra files the agents must never change (added to the defaults)
+#    author_allowlist: [your-github-login]          # only issues opened by these people are picked up
 poll_interval_s: 300
 max_model_calls_per_run: 60      # per agent invocation; keeps one run's spend bounded
 max_tool_calls_per_run: 200

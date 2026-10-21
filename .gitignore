@@ -12,3 +12,5 @@ runs/
 *.db
 .pytest_cache/
 !.env.example
+.DS_Store
+uv.lock
