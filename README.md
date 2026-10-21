@@ -73,13 +73,12 @@ https://github.com/user-attachments/assets/014654ff-ab4b-4968-90a4-cfe01fa8bc64
 
 ## Quick start
 
-### Check it without any keys
+### See it without any keys
 
-Running CodePilot+ live needs paid API keys and a GitHub App. Without them you can still run the tests, check the agents' tool sets, and replay the real run of issue #25 from the demo. You need only Python 3.12 and [uv](https://docs.astral.sh/uv/).
+Running CodePilot+ live needs paid API keys and a GitHub App. Without them you can still check the agents' tool sets and replay the real run of issue #25 from the demo. You need only Python 3.12 and [uv](https://docs.astral.sh/uv/).
 
 ```bash
 git clone https://github.com/LijiAlex/codepilot-agent && cd codepilot-agent
-uv run pytest                                               # 439 tests
 uv run codepilot selfcheck                                  # every agent has exactly its intended tools
 uv run codepilot replay examples/run-issue-25/events.jsonl  # the recorded run of issue #25 from the demo, step by step
 ```
