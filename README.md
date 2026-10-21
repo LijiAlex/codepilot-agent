@@ -17,24 +17,23 @@ CodePilot+ is a multi-agent coding platform that turns a labelled GitHub issue i
 
 **Contents:** [Demo](#demo) · [How it works](#how-it-works) · [What's included](#whats-included) · [Quick start](#quick-start) · [Using it](#using-it) · [Connect your own repository](#connect-your-own-repository) · [Architecture](#architecture) · [Example pull requests](#example-pull-requests) · [Safety](#safety) · [Results](#results) · [Design choices](#design-choices) · [For reviewers](#for-reviewers-the-assignment-brief) · [Known limitations](#known-limitations)
 
-## CodePilot+ in 30 seconds
+## CodePilot+ in a nut shell
 
 https://github.com/user-attachments/assets/014654ff-ab4b-4968-90a4-cfe01fa8bc64
 
 
-## Demo
+## See It in Action
 
-| | What it shows |
-|---|---|
-| ▶ [**Demo video**](https://youtu.be/-jkHc7YaXk8) (5 min) | Issue polling, a guardrail block, a full run from issue to pull request, the human approval, the independent review and the dashboard |
-| ▶ [**Architecture walk-through**](https://youtu.be/LpQGS6tEbiQ) (9 min) | Every box on the architecture diagram, explained in order |
-| 📄 [**Slide deck (PDF)**](docs/codepilot-deck.pdf) | The problem, one issue followed end to end, the evidence, the design decisions |
+- **[▶ Demo (5 min)](https://youtu.be/-jkHc7YaXk8)**  
+  Follow a complete run, from GitHub issue polling and prompt-injection blocking to code changes, human approval, independent review, and the dashboard.
 
+- **[▶ Architecture Walkthrough (9 min)](https://youtu.be/LpQGS6tEbiQ)**  
+  Explore the architecture component by component and see how the agents, sandbox, and review workflow fit together.
 ### Terminal UI
 
-![The terminal UI: a poll runs, issue #13 is blocked by the injection screen, issue #25 is claimed and triaged](docs/tui.gif)
+![CodePilot+ terminal UI showing issue polling, prompt-injection blocking, task triage, agent logs, and pending approvals](docs/tui.gif)
 
-*The terminal UI during a live run. Top left: every issue picked up and its status (the title shows the 5-minute poll). Top right: the task in progress. Bottom left: the agent log, where issue #13 is blocked by the injection screen and #25 is triaged as a bug fix. Bottom right: items waiting for your approval.*
+*The terminal UI during a live run. Track issue polling and task progress, inspect agent logs, see prompt-injection attempts blocked, and review changes awaiting your approval.*
 
 ## How it works
 
