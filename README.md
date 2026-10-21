@@ -1,8 +1,19 @@
 # CodePilot+
 
-**An AI coding agent that picks up GitHub issues, fixes them in a sandbox, tests the fix, and opens a pull request — but only after a person approves it.**
+### The problem
 
-Engineering teams lose hours every sprint to small, well-defined issues: a bug flagged by a test, a dependency bump, a missing paragraph in the docs. You label an issue `ai-assignable`; a team of AI agents finds the relevant code, makes the change in an isolated copy of the repository, runs the tests and prepares a pull request. Nothing reaches GitHub until you approve it.
+Engineering teams lose hours every sprint to small, well-defined issues, such as a bug flagged by a test, a dependency update or a missing paragraph in the documentation. AI coding agents can do this work, but teams cannot simply trust what comes back: the agent might follow instructions planted in an issue, push unreviewed code or mark its own work as correct.
+
+### What CodePilot+ does
+
+CodePilot+ is a multi-agent coding platform that turns a labelled GitHub issue into a tested, independently reviewed pull request, with a person in control at every step that matters.
+
+- When you label an issue `ai-assignable`, a team of AI agents finds the relevant code, makes the change in an isolated cloud sandbox and runs the tests.
+- Every issue is screened for prompt injection before any AI agent reads it.
+- The sandbox has no GitHub credentials, so the agents cannot push anything themselves; a pull request is opened only after you approve the change.
+- An independent AI reviewer from a different company scores every pull request.
+- The system learns from each run and proposes improvements to its own playbooks, which take effect only when you approve them.
+- A terminal UI shows the work as it happens, and a dashboard records everything afterwards.
 
 **Contents:** [Demo](#demo) · [How it works](#how-it-works) · [What's included](#whats-included) · [Quick start](#quick-start) · [Using it](#using-it) · [Connect your own repository](#connect-your-own-repository) · [Architecture](#architecture) · [Example pull requests](#example-pull-requests) · [Safety](#safety) · [Results](#results) · [Design choices](#design-choices) · [For reviewers](#for-reviewers-the-assignment-brief) · [Known limitations](#known-limitations)
 
