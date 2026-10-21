@@ -73,21 +73,10 @@ https://github.com/user-attachments/assets/014654ff-ab4b-4968-90a4-cfe01fa8bc64
 
 ## Quick start
 
-### See it without any keys
-
-Running CodePilot+ live needs paid API keys and a GitHub App. Without them you can still check the agents' tool sets and replay the real run of issue #25 from the demo. You need only Python 3.12 and [uv](https://docs.astral.sh/uv/).
-
-```bash
-git clone https://github.com/LijiAlex/codepilot-agent && cd codepilot-agent
-uv run codepilot selfcheck                                  # every agent has exactly its intended tools
-uv run codepilot replay examples/run-issue-25/events.jsonl  # the recorded run of issue #25 from the demo, step by step
-```
-
-### Run it live
-
 You need: Python 3.12, [uv](https://docs.astral.sh/uv/), an Anthropic API key, a [LangSmith](https://smith.langchain.com/) API key for tracing, an OpenAI API key for the independent reviewer, a [Daytona](https://www.daytona.io/) API key (or `sandbox: local` in `codepilot.yml` for a weaker macOS-only sandbox), and a GitHub App (see [Connect your own repository](#connect-your-own-repository)).
 
 ```bash
+git clone https://github.com/LijiAlex/codepilot-agent && cd codepilot-agent
 cp .env.example .env                    # fill in your keys
 cp codepilot.example.yml codepilot.yml  # then delete the two example entries under repos:
 ```
