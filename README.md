@@ -73,7 +73,7 @@ https://github.com/user-attachments/assets/014654ff-ab4b-4968-90a4-cfe01fa8bc64
 
 ## Quick start
 
-You need: Python 3.12, [uv](https://docs.astral.sh/uv/), an Anthropic API key, a [LangSmith](https://smith.langchain.com/) API key for tracing, an OpenAI API key for the independent reviewer, a [Daytona](https://www.daytona.io/) API key (or `sandbox: local` in `codepilot.yml` for a weaker macOS-only sandbox), and a GitHub App (see [Connect your own repository](#connect-your-own-repository)).
+You need: Python 3.12, [uv](https://docs.astral.sh/uv/), an Anthropic API key, a [LangSmith](https://smith.langchain.com/) API key for tracing, an OpenAI API key for the independent reviewer, a [Daytona](https://www.daytona.io/) API key (or a local sandbox on macOS, set with `sandbox: local` in `codepilot.yml`; it is covered by tests only and was not used in the live runs), and a GitHub App (see [Connect your own repository](#connect-your-own-repository)).
 
 ```bash
 git clone https://github.com/LijiAlex/codepilot-agent && cd codepilot-agent
